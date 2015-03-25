@@ -9,17 +9,12 @@
 ; 1. check memory, get params
 ; 2. check hd, get params
 ; 3. cli
-; 4. move kernel.bin to memory 0x00000
-; 5. set IDT, GDT, A20, 8259A, enable Protected-Mode
-; 6. jump to kernel.bin start point and execute
-    jmp short SETUP_START
+; 4. load kernel to memory 0x00000
+; 5. set GDT, A20, enable Protected-Mode
+; 6. jump to head part of kernel.bin
 
-%include    "const.inc"
-%include    "pm.inc"
-
-INIT_SEGMENT        equ 0x9000
-SETUP_SEGMENT       equ 0x9020
-KERNEL_SEGMENT      equ 0x1000
+%include "const.inc"
+%include "pm.inc"
 
 SETUP_START:
     mov ax, cs
@@ -45,9 +40,25 @@ SETUP_START:
     ; 3. cli
     cli
 
-    ; 4. move kernel.bin to memory 0x00000
+    ; 4. load kernel to memory 0x00000
+    push ds
+    mov ax, 0
+    cld
+move_kernel:
+    mov es, ax
+    add ax, 0x1000
+    cmp ax, INIT_SEGMENT
+    jz move_kernel_end
+    mov ds, ax
+    xor si, si
+    xor di, di
+    mov cx, 0x8000
+    rep movsw       ; ds:si -> es:di
+    jmp move_kernel
+move_kernel_end:
+    pop ds
 
-    ; 5. set IDT, GDT, A20, 8259A, enable Protected-Mode
+    ; 5. set GDT, A20, enable Protected-Mode
     ; load GDT
     lgdt    [GdtPtr]
     ; enable A20, so we can access memory >= 1 MB
@@ -59,10 +70,10 @@ SETUP_START:
     or  eax, 1
     mov cr0, eax
 
-    ;; jump to code for protected-mode
+    ; 6. jump to head part of kernel.bin
     ; note the address translation has already changed,
     ; also note this jmp is a 32-bit instruction in 16-bit code segment.
-    jmp dword SelectorFlatC:(SETUP_SEGMENT * 16 + LABEL_PM_START)
+    jmp dword SelectorFlatC:0x1000
 
 
 ;-------------------------------------
@@ -127,6 +138,30 @@ memory_check_end:
     ret
 memory_check_error:
     jmp $
+
+; @LoadKernel
+LoadKernel:
+    ;; FIXIT
+    xor esi, esi
+    mov cx, word [ds:KERNEL_SEGMENT * 16 + 2Ch]   ; ┓ ecx <- pELFHdr->e_phnum
+    movzx   ecx, cx                             ; ┛
+    mov esi, [ds:KERNEL_SEGMENT * 16 + 1Ch]       ; esi <- pELFHdr->e_phoff
+    add esi, KERNEL_SEGMENT * 16               ; esi <- OffsetOfKernel + pELFHdr->e_phoff
+.Begin:
+    mov eax, [ds:esi + 0]
+    cmp eax, 0                      ; PT_NULL
+    jz  .NoAction
+    push    dword [ds:esi + 010h]      ; size  ┓
+    mov eax, [ds:esi + 04h]            ;       ┃
+    add eax, KERNEL_SEGMENT * 16   ;       ┣ ::memcpy( (void*)(pPHdr->p_vaddr),
+    push    eax                     ; src   ┃       uchCode + pPHdr->p_offset,
+    push    dword [ds:esi + 08h]       ; dst   ┃       pPHdr->p_filesz;
+    ;call    MemCpy                  ;       ┃
+    add esp, 12                     ;       ┛
+.NoAction:
+    add esi, 020h           ; esi += pELFHdr->e_phentsize
+    dec ecx
+    jnz .Begin
 
 ; @DispString
 ; in:
@@ -226,43 +261,4 @@ disp_word_3:
     mov [ds:bCursorRow], dh
     mov [ds:bCursorCol], dl
     ret
-
-;-------------------------------------
-; Code executes in 386 Protected-Mode
-
-[SECTION .s32]
-ALIGN   32
-[BITS   32]
-
-LABEL_PM_START:
-    mov ax, SelectorVideo
-    mov gs, ax
-    mov ax, SelectorFlatRW
-    mov ds, ax
-    mov es, ax
-    mov fs, ax
-    mov ss, ax
-    mov esp, SETUP_STACKTOP
-
-    mov byte [gs:0], 'P'
-
-    jmp $
-    ; 6. jump to kernel.bin start point and execute
-    jmp SelectorFlatC:KERNEL_START  ; jump to kernel!
-
-;-------------------------------------
-; Functions in 386 Protected-Mode
-
-
-;-------------------------------------
-; Data in 386 Protected-Mode
-
-[SECTION .data1]
-ALIGN   32
-
-LABEL_DATA:
-
-; 堆栈就在数据段的末尾
-times   100h    db  0
-SETUP_STACKTOP  equ SETUP_SEGMENT * 16 + $ ; 栈顶
 

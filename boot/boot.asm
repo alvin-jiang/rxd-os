@@ -22,20 +22,18 @@
 ;   boot device into RAM, starting from physical address 0x00007c00
 ; 2. jump to 0x00007c00 and execute
 
-INIT_SEGMENT        equ 0x9000
-SETUP_SEGMENT       equ 0x9020
-KERNEL_SEGMENT      equ 0x1000
+%include "const.inc"
 
     ; move self from 0x7c00 -> 0x9000
     cld
-    mov ax, INIT_SEGMENT
-    mov es, ax
     mov ax, 0x07c0
     mov ds, ax
-    xor di, di
+    mov ax, INIT_SEGMENT
+    mov es, ax
     xor si, si
+    xor di, di
     mov cx, 256
-    rep movsw       ; es:di -> ds:si
+    rep movsw       ; ds:si -> es:di
     jmp word INIT_SEGMENT:INIT_START;
 
 INIT_START:
@@ -44,7 +42,7 @@ INIT_START:
     mov ds, ax
     mov es, ax
     mov ss, ax
-    mov sp, 0xff00
+    mov sp, 0xf000  ; 0x9f000
 
     ; show "start booting..."
     call    ClearScreen
@@ -69,13 +67,14 @@ INIT_START:
     ; show "loading kernel..."
     mov bp, Msg_Kernel
     call    DispMsg
-    ; mov ax, KERNEL_SEGMENT
-    ; mov es, ax
-    ; mov bx, 0
-    ; mov ax, [bSetupBinSize]
-    ; inc ax
-    ; mov cl, [bKernelBinSize]
-    ; call    ReadRootDevSector
+    mov ax, KERNEL_SEGMENT
+    mov es, ax
+    mov bx, 0
+    mov al, [bSetupBinSize]
+    mov ah, 0
+    inc ax
+    mov cl, [bKernelBinSize]
+    call    ReadRootDevSector
 
     ; 3.
     ; if boot with floppy disk:
@@ -86,6 +85,7 @@ INIT_START:
     ;   ...
 
     ; 4. jump to setup.bin start point
+
     jmp SETUP_SEGMENT:0000h   ; jump to setup.bin!
 
 
