@@ -179,15 +179,15 @@ ReadRootDevSector:
 
     mov dl, ROOT_DEV            ; DL - drive number (bit 7 set for hard disk)
 
-read_sector_retry:
+.retry:
     mov ah, 02h                 ; AH - 02h, Read Sector(s) Into Memory
     mov al, [bSecReadCnt]       ; AL - number of sectors to read (>0)
     int 13h                     ; BIOS low level disk services
-    jnc read_sector_succeed
+    jnc .succeed
     mov ah, 00h
     int 13h
-    jmp read_sector_retry
-read_sector_succeed:
+    jmp .retry
+.succeed:
     ret
 
 ; @KillMotor

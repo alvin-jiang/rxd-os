@@ -9,9 +9,10 @@
 ; 1. check memory, get params
 ; 2. check hd, get params
 ; 3. cli
-; 4. load kernel to memory 0x00000
-; 5. set GDT, A20, enable Protected-Mode
-; 6. jump to head part of kernel.bin
+; 4. move kernel to memory 0x00000
+; 5. fix 8259A
+; 6. set temporary GDT, A20, enable Protected-Mode
+; 7. jump to head part of kernel.bin
 
 %include "const.inc"
 %include "pm.inc"
@@ -38,27 +39,30 @@ SETUP_START:
     ; 2. check hd, get params
 
     ; 3. cli
+    ; we can't call BIOS functions after this!
     cli
 
-    ; 4. load kernel to memory 0x00000
+    ; 4. move kernel to memory 0x00000
     push ds
-    mov ax, 0
-    cld
-move_kernel:
-    mov es, ax
-    add ax, 0x1000
-    cmp ax, INIT_SEGMENT
-    jz move_kernel_end
+    mov ax, INIT_SEGMENT
     mov ds, ax
+    mov al, [ds:509]
+    movzx ax, al
+    shl ax, 8
+    mov cx, ax      ; ax = kernel size in words
+    mov bx, KERNEL_SEGMENT
+    mov ds, bx
+    mov bx, 0x0000
+    mov es, bx
     xor si, si
     xor di, di
-    mov cx, 0x8000
     rep movsw       ; ds:si -> es:di
-    jmp move_kernel
-move_kernel_end:
     pop ds
 
-    ; 5. set GDT, A20, enable Protected-Mode
+    ; 5. fix 8259A
+    call    Init8259A
+
+    ; 6. set temporary GDT, A20, enable Protected-Mode
     ; load GDT
     lgdt    [GdtPtr]
     ; enable A20, so we can access memory >= 1 MB
@@ -70,10 +74,10 @@ move_kernel_end:
     or  eax, 1
     mov cr0, eax
 
-    ; 6. jump to head part of kernel.bin
+    ; 7. jump to head part of kernel.bin
     ; note the address translation has already changed,
     ; also note this jmp is a 32-bit instruction in 16-bit code segment.
-    jmp dword SelectorFlatC:0x1000
+    jmp dword SelectorFlatC:0x0000
 
 
 ;-------------------------------------
@@ -114,54 +118,78 @@ SelectorVideo       equ LABEL_DESC_VIDEO    - LABEL_GDT + SA_RPL3
 MemoryCheck:
     mov ax, 0e801h
     int 15h
-    jc memory_check_error
+    jc .error
     test ax, ax
-    jz memory_check_error
+    jz .error
 
     test bx, bx
-    jz memory_check_no_high
+    jz .no_high
     mov cx, bx
     and cx, 03ffh
     shl cx, 6
     add cx, ax
     mov [ds:wEXMemSizeLow], cx
     shr bx, 10
-    jnc memory_check_1
+    jnc .no_carry
     inc bx
-memory_check_1:
+.no_carry:
     mov [ds:wEXMemSizeHigh], bx
-    jmp memory_check_end
-memory_check_no_high:
+    jmp .end
+.no_high:
     mov [ds:wEXMemSizeLow], ax
     mov word [ds:wEXMemSizeHigh], 0
-memory_check_end:
+.end:
     ret
-memory_check_error:
+.error:
     jmp $
 
-; @LoadKernel
-LoadKernel:
-    ;; FIXIT
-    xor esi, esi
-    mov cx, word [ds:KERNEL_SEGMENT * 16 + 2Ch]   ; ┓ ecx <- pELFHdr->e_phnum
-    movzx   ecx, cx                             ; ┛
-    mov esi, [ds:KERNEL_SEGMENT * 16 + 1Ch]       ; esi <- pELFHdr->e_phoff
-    add esi, KERNEL_SEGMENT * 16               ; esi <- OffsetOfKernel + pELFHdr->e_phoff
-.Begin:
-    mov eax, [ds:esi + 0]
-    cmp eax, 0                      ; PT_NULL
-    jz  .NoAction
-    push    dword [ds:esi + 010h]      ; size  ┓
-    mov eax, [ds:esi + 04h]            ;       ┃
-    add eax, KERNEL_SEGMENT * 16   ;       ┣ ::memcpy( (void*)(pPHdr->p_vaddr),
-    push    eax                     ; src   ┃       uchCode + pPHdr->p_offset,
-    push    dword [ds:esi + 08h]       ; dst   ┃       pPHdr->p_filesz;
-    ;call    MemCpy                  ;       ┃
-    add esp, 12                     ;       ┛
-.NoAction:
-    add esi, 020h           ; esi += pELFHdr->e_phentsize
-    dec ecx
-    jnz .Begin
+Init8259A:
+    mov al, 011h
+    out 020h, al    ; 主8259, ICW1.
+    call    io_delay
+
+    out 0A0h, al    ; 从8259, ICW1.
+    call    io_delay
+
+    mov al, 020h    ; IRQ0 对应中断向量 0x20
+    out 021h, al    ; 主8259, ICW2.
+    call    io_delay
+
+    mov al, 028h    ; IRQ8 对应中断向量 0x28
+    out 0A1h, al    ; 从8259, ICW2.
+    call    io_delay
+
+    mov al, 004h    ; IR2 对应从8259
+    out 021h, al    ; 主8259, ICW3.
+    call    io_delay
+
+    mov al, 002h    ; 对应主8259的 IR2
+    out 0A1h, al    ; 从8259, ICW3.
+    call    io_delay
+
+    mov al, 001h
+    out 021h, al    ; 主8259, ICW4.
+    call    io_delay
+
+    out 0A1h, al    ; 从8259, ICW4.
+    call    io_delay
+
+    mov    al, 11111111b   ; 屏蔽主8259所有中断
+    out 021h, al    ; 主8259, OCW1.
+    call    io_delay
+
+    mov al, 11111111b   ; 屏蔽从8259所有中断
+    out 0A1h, al    ; 从8259, OCW1.
+    call    io_delay
+
+    ret
+
+io_delay:
+    nop
+    nop
+    nop
+    nop
+    ret
 
 ; @DispString
 ; in:
@@ -172,19 +200,19 @@ DispString:
     mov dh, [ds:bCursorRow]     ; DH - row of cursor (00h is top)
     inc dh
     mov dl, 0                   ; DL - col of cursor (00h is left)
-disp_msg_next_char:
+.next_char:
     mov ah, 02h                 ; AH - 02h, Set Cursor Position
     int 10h
     mov ah, 0ah                 ; AH - 09h, Write Character
     mov al, [ds:bp]             ; AL - character to write
     test al, al
-    jz disp_msg_end
+    jz .end
     mov cx, 1                   ; CX - number of times to write
     int 10h
     inc bp
     inc dl
-    jmp disp_msg_next_char
-disp_msg_end:
+    jmp .next_char
+.end:
     mov [ds:bCursorRow], dh
     mov [ds:bCursorCol], dl
     ret

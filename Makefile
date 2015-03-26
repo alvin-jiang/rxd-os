@@ -26,35 +26,42 @@ DASMFLAGS	= -D
 CC		= gcc
 CFLAGS	= -I include/ -I include/sys/ -m32 -c -fno-builtin -fno-stack-protector
 LD		= ld
-LDFLAGS		= -m elf_i386 -Map krnl.map -Ttext $(ENTRYPOINT)
+LDFLAGS		= -m elf_i386 --oformat=binary -Map krnl.map -Ttext $(ENTRYPOINT)
+#LDFLAGS	= -m elf_i386 -Map krnl.map -Ttext $(ENTRYPOINT)
 
 szfiles		= .progsz .progsz.0
 
 # This Program
+#bootsrc != find ./boot/*.asm
 bootsrc = ./boot/boot.asm ./boot/setup.asm
 bootprog = $(bootsrc:.asm=.bin)
-kernelsrc = ./boot/head.asm
-kernelobjs = ./boot/head.o
+kernelsrc = ./boot/head.asm $(wildcard ./kernel/*.c)
+kernelobjs = ./boot/head.o $(patsubst %.c, %.o, $(wildcard ./kernel/*.c))
 kernelprog = kernel.bin
 sysimg = rxdos.img
 
 # All Phony Targets
-.PHONY : all clean
+.PHONY : rebuild source clean
 
 # Default starting position
 $(sysimg) : $(bootprog) $(kernelprog) $(szfiles)
-	dd if=boot/boot.bin of=$(sysimg) bs=512 count=1 conv=notrunc
-	dd if=.progsz.0 of=$(sysimg) bs=1 seek=508 count=2 conv=notrunc
-	dd if=boot/setup.bin of=$(sysimg) bs=512 conv=notrunc seek=1 count=`awk '{printf "%s", $$2}' .progsz`
-	dd if=$(kernelprog) of=$(sysimg) bs=512 conv=notrunc seek=`awk '{printf "%s", $$2+1}' .progsz` count=`awk '{printf "%s", $$4}' .progsz`
+	dd if=boot/boot.bin of=$@ bs=512 count=1 conv=notrunc
+	dd if=.progsz.0 of=$@ bs=1 seek=508 count=2 conv=notrunc
+	dd if=boot/setup.bin of=$@ bs=512 conv=notrunc seek=1 count=`awk '{printf "%s", $$2}' .progsz`
+	dd if=$(kernelprog) of=$@ bs=512 conv=notrunc seek=`awk '{printf "%s", $$2+1}' .progsz` count=`awk '{printf "%s", $$4}' .progsz`
 
-all : $(bootprog) $(kernelprog)
+rebuild : clean $(sysimg)
+
+source : $(bootprog) $(kernelprog)
 
 clean :
 	rm -f $(bootprog) $(kernelprog) $(szfiles) $(kernelobjs)
 
 $(kernelprog) : $(kernelobjs)
 	$(LD) $(LDFLAGS) $^ -o $@
+
+%.o : %.c
+	$(CC) $(CFLAGS) $< -o $@
 
 ./boot/head.o : ./boot/head.asm
 	$(ASM) $(ASMOBJ) $< -o $@
