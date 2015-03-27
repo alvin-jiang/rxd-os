@@ -12,10 +12,9 @@
 ; 4. jump to main.c
 
 %include    "pm.inc"
-
 extern _maink
 
-[SECTION .s32]
+[SECTION .text]
 ALIGN 32
 [BITS 32]
 
@@ -78,6 +77,7 @@ RETURN_FROM_MAIN:
 
 ;-------------------------------------
 ; Functions
+;-------------------------------------
 CheckA20:
     xor eax, eax
 .loop:
@@ -100,14 +100,14 @@ SetupPaging:
     rep stosd
 
     ; set PDE
-    mov dword [0], Page0 + PG_ATTR
-    mov dword [4], Page1 + PG_ATTR
-    mov dword [8], Page2 + PG_ATTR
-    mov dword [12], Page3 + PG_ATTR
+    mov dword [0], Page0 + PG_DEFAULT
+    mov dword [4], Page1 + PG_DEFAULT
+    mov dword [8], Page2 + PG_DEFAULT
+    mov dword [12], Page3 + PG_DEFAULT
 
     ; set PTE
     mov edi, Page3 + 4092
-    mov eax, 0xfff000 + PG_ATTR
+    mov eax, 0xfff000 + PG_DEFAULT
     std
 .next_pde:
     stosd
@@ -122,16 +122,6 @@ SetupPaging:
     mov cr0, eax
     ret
 
-global TestFunc
-TestFunc:
-    mov ax, SelectorVideo
-    mov gs, ax
-    mov byte [gs:30], 'M'
-    mov byte [gs:32], 'a'
-    mov byte [gs:34], 'i'
-    mov byte [gs:36], 'n'
-    ret
-
 _SpuriousHandler:
 SpuriousHandler equ _SpuriousHandler - $$
     mov ah, 0Ch
@@ -140,9 +130,10 @@ SpuriousHandler equ _SpuriousHandler - $$
     jmp $
     iretd
 
-[SECTION .pmdata]
+;-------------------------------------
+; IDTR & GDTR
+;-------------------------------------
 ALIGN 32
-
 IDTR    dw 256 * 8 - 1
         dd LABEL_IDT
 
@@ -151,6 +142,8 @@ GDTR    dw 256 * 8 - 1
 
 ;-------------------------------------
 ; IDT
+;-------------------------------------
+ALIGN 64
 LABEL_IDT:
 %rep 256
     Gate    SelectorFlatC, SpuriousHandler, 0, DA_386IGate
@@ -158,7 +151,8 @@ LABEL_IDT:
 
 ;-------------------------------------
 ; GDT
-; descriptors
+;-------------------------------------
+ALIGN 64
 LABEL_GDT:
 LABEL_DESC_NULL:        Descriptor             0,                    0, 0
 LABEL_DESC_FLAT_C:      Descriptor             0,              0fffffh, DA_CR  | DA_32 | DA_LIMIT_4K
@@ -175,6 +169,7 @@ SelectorVideo       equ LABEL_DESC_VIDEO    - LABEL_GDT + SA_RPL3
 
 ;-------------------------------------
 ; Kernel Stack
+;-------------------------------------
 times   100h    db  0
 SETUP_STACKTOP  equ $ ; 栈顶
 

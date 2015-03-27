@@ -22,7 +22,9 @@
 ;   boot device into RAM, starting from physical address 0x00007c00
 ; 2. jump to 0x00007c00 and execute
 
-%include "const.inc"
+INIT_SEGMENT        equ 0x9000
+SETUP_SEGMENT       equ 0x9020
+KERNEL_SEGMENT      equ 0x1000
 
     ; move self from 0x7c00 -> 0x9000
     cld
@@ -42,7 +44,7 @@ INIT_START:
     mov ds, ax
     mov es, ax
     mov ss, ax
-    mov sp, 0xf000  ; 0x9f000
+    mov sp, 0xf000  ; 0x9f000 < 0x9fc00
 
     ; show "start booting..."
     call    ClearScreen
@@ -54,6 +56,7 @@ INIT_START:
 
     ; 1. load setup.bin into memory
     ; show "loading setup..."
+    push es
     mov bp, Msg_Setup
     call    DispMsg
     mov ax, SETUP_SEGMENT
@@ -75,6 +78,7 @@ INIT_START:
     inc ax
     mov cl, [bKernelBinSize]
     call    ReadRootDevSector
+    pop es
 
     ; 3.
     ; if boot with floppy disk:
@@ -92,7 +96,7 @@ INIT_START:
 
 ;-------------------------------------
 ; Variables
-
+;-------------------------------------
 ; used in DispMsg()
 bPrintToLine        db  0 ; print to which line?
 DispMsgLen          equ 17
@@ -110,8 +114,7 @@ bHeads              db 0 ; how many heads?
 
 ;-------------------------------------
 ; Functions
-
-; @ClearScreen
+;-------------------------------------
 ClearScreen:
     mov ax, 0600h       ; AH - 06h, Scroll Up Window
                         ; AL - 00h, blank window
@@ -123,10 +126,10 @@ ClearScreen:
     int 10h             ; BIOS video service
     ret
 
-; @DispMsg
+DispMsg:
 ; in:
 ;   es:bp - Message Offset
-DispMsg:
+
     mov ax, cs
     mov es, ax
 
@@ -142,9 +145,7 @@ DispMsg:
     int 10h                     ; BIOS video service
     ret
 
-; @GetRootDevParams
-; description: support floppy & hard disk
-GetRootDevParams:
+GetRootDevParams: ; support floppy & hard disk
     mov ah, 08h                 ; AH - 08h, Get Drive Parameters
     mov dl, ROOT_DEV            ; DL - driver number (bit 7 set for hard disk)
     int 13h                     ; BIOS low level disk services
@@ -153,12 +154,12 @@ GetRootDevParams:
     mov [bHeads], dh
     ret
 
-; @ReadRootDevSector
+ReadRootDevSector:
 ; in:
 ;   ax - Start Sector(LBA)
 ;   cl - Count to Read
 ;   es:bx - Result Output
-ReadRootDevSector:
+
     mov [bSecReadCnt], cl
 
     mov dl, [bSecPerTrk]
@@ -190,9 +191,7 @@ ReadRootDevSector:
 .succeed:
     ret
 
-; @KillMotor
-; description: kill floppy disk motor
-KillMotor:
+KillMotor: ; kill floppy disk motor
     push dx
     mov dx, 03F2h
     mov al, 0
@@ -203,6 +202,7 @@ KillMotor:
 
 ;-------------------------------------
 ; Special Params
+;-------------------------------------
 times   508-($-$$)  db  0   ; fill bytes
 
 ; Note: these two params are automatically filled by make!
@@ -211,4 +211,5 @@ bKernelBinSize      db  0   ; how many sectors kernel.bin takes?
 
 ;-------------------------------------
 ; End of Boot Sector
+;-------------------------------------
 dw      0xaa55              ; end flag, last 2 bytes of boot sector(511-512)

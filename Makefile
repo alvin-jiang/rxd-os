@@ -16,15 +16,12 @@ SHELL	= /bin/bash
 
 ASM		= nasm
 # flags for boot
-ASMBIN	= -I boot/include/
+ASMBIN	= -I boot/
 # flags for kernel
-ASMOBJ	= -I boot/include/ -f elf32
-
-DASM	= objdump
-DASMFLAGS	= -D
+ASMOBJ	= -I boot/ -f elf32
 
 CC		= gcc
-CFLAGS	= -I include/ -I include/sys/ -m32 -c -fno-builtin -fno-stack-protector
+CFLAGS	= -I include/ -m32 -c -fno-builtin -fno-stack-protector
 LD		= ld
 LDFLAGS		= -m elf_i386 --oformat=binary -Map krnl.map -Ttext $(ENTRYPOINT)
 #LDFLAGS	= -m elf_i386 -Map krnl.map -Ttext $(ENTRYPOINT)
@@ -35,8 +32,17 @@ szfiles		= .progsz .progsz.0
 #bootsrc != find ./boot/*.asm
 bootsrc = ./boot/boot.asm ./boot/setup.asm
 bootprog = $(bootsrc:.asm=.bin)
-kernelsrc = ./boot/head.asm $(wildcard ./kernel/*.c)
-kernelobjs = ./boot/head.o $(patsubst %.c, %.o, $(wildcard ./kernel/*.c))
+
+kernelsrc = ./boot/head.asm \
+	$(wildcard ./kernel/*.c) $(wildcard ./kernel/*.asm)
+kernelobjs = ./boot/head.o \
+	$(patsubst %.c, %.o, $(wildcard ./kernel/*.c)) \
+	$(patsubst %.asm, %.o, $(wildcard ./kernel/*.asm))
+
+libsrc = $(wildcard ./lib/*.c) $(wildcard ./lib/*.asm)
+libobjs = $(patsubst %.c, %.o, $(wildcard ./lib/*.c)) \
+	$(patsubst %.asm, %.o, $(wildcard ./lib/*.asm))
+
 kernelprog = kernel.bin
 sysimg = rxdos.img
 
@@ -50,20 +56,20 @@ $(sysimg) : $(bootprog) $(kernelprog) $(szfiles)
 	dd if=boot/setup.bin of=$@ bs=512 conv=notrunc seek=1 count=`awk '{printf "%s", $$2}' .progsz`
 	dd if=$(kernelprog) of=$@ bs=512 conv=notrunc seek=`awk '{printf "%s", $$2+1}' .progsz` count=`awk '{printf "%s", $$4}' .progsz`
 
-rebuild : clean $(sysimg)
+rebuild : clean source
 
 source : $(bootprog) $(kernelprog)
 
 clean :
-	rm -f $(bootprog) $(kernelprog) $(szfiles) $(kernelobjs)
+	rm -f $(bootprog) $(kernelprog) $(szfiles) $(kernelobjs) $(libobjs)
 
-$(kernelprog) : $(kernelobjs)
+$(kernelprog) : $(kernelobjs) $(libobjs)
 	$(LD) $(LDFLAGS) $^ -o $@
 
 %.o : %.c
 	$(CC) $(CFLAGS) $< -o $@
 
-./boot/head.o : ./boot/head.asm
+%.o : %.asm
 	$(ASM) $(ASMOBJ) $< -o $@
 
 %.bin : %.asm
