@@ -7,13 +7,22 @@
  *
  */
 
- #include "stdio.h"
+#include "proc.h"
 
-int _maink(int argc, char **argv)
+void main(void)
 {
-    printk("\n\nhello RXD-OS! I'm printk !!!");
-    while(1)
-        ;
-    return 0;
+    printk("\n\n");
+    printk("hello RXD-OS! I'm printk !!!\n");
+    //mem_init(0x100000, BOOT_PARAM_MEM_SIZE);
+    proc_init();
+
+    move_to_user_mode();
+
+    // if (!fork()) { // copy, set eip, tss, ldt
+    //     init();
+    // }
+
+    // loop forever
+    while(1);
 }
 

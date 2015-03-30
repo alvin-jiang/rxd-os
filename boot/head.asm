@@ -11,74 +11,75 @@
 ; 3. setup Paging
 ; 4. jump to main.c
 
+extern main, printk
+global _start, _gdt, _idt
+
 %include    "pm.inc"
-extern _maink
+STACK_TOP   equ 0x90000
 
 [SECTION .text]
-ALIGN 32
+ALIGN 4
 [BITS 32]
 
-global _start
 _start:
     ; we are in protected-mode now
 
     ; 1. reset GDT
-    mov ax, SelectorVideo
+    mov ax, _sel_video
     mov gs, ax
-    mov ax, SelectorFlatRW
+    mov ax, _sel_data
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov ss, ax
-    mov esp, SETUP_STACKTOP
-    lgdt [GDTR]
+    mov esp, STACK_TOP
+    lgdt [_gdtr]
 
     ; 2. reset segment regs, check A20, setup IDT
-    mov ax, SelectorVideo
+    mov ax, _sel_video
     mov gs, ax
-    mov ax, SelectorFlatRW
+    mov ax, _sel_data
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov ss, ax
-    mov esp, SETUP_STACKTOP
-    call    CheckA20
-    call    SetupIDT
+    mov esp, STACK_TOP
+    call    _func_check_a20
+    call    _func_setup_idt
 
-    jmp SelectorFlatC:AFTER_PAGE_TABLE
+    jmp _sel_code:_after_page_table
 
 times   0x1000-($-$$)  db  0
-Page0:
+_page0:
 times   0x2000-($-$$)  db  0
-Page1:
+_page1:
 times   0x3000-($-$$)  db  0
-Page2:
+_page2:
 times   0x4000-($-$$)  db  0
-Page3:
+_page3:
 
 times   0x5000-($-$$)  db  0
-
-AFTER_PAGE_TABLE:
-    ; we can now safely override the code starting at 0x0000 
+_after_page_table:
+    ; we can now safely override the code starting at 0x0000
     ; 3. setup Paging
-    call    SetupPaging
+    call    _func_setup_paging
 
     ; 4. jump to main.c
     push 0 ; arg data
     push 0 ; argv
     push 0 ; argc
-    push RETURN_FROM_MAIN
-    push _maink
+    push _return_from_main
+    push main
     ret
 
-RETURN_FROM_MAIN:
+_return_from_main:
     jmp $ ; main should not return
 
 
 ;-------------------------------------
 ; Functions
 ;-------------------------------------
-CheckA20:
+_func_check_a20:
     xor eax, eax
 .loop:
     inc eax
@@ -87,11 +88,11 @@ CheckA20:
     je .loop
     ret
 
-SetupIDT:
-    lidt [LABEL_IDT]
+_func_setup_idt:
+    lidt [_idtr]
     ret
 
-SetupPaging:
+_func_setup_paging:
     ; zero memory [0x0000, 0x5000)
     mov ecx, 1024 * 5
     xor eax, eax
@@ -100,13 +101,13 @@ SetupPaging:
     rep stosd
 
     ; set PDE
-    mov dword [0], Page0 + PG_DEFAULT
-    mov dword [4], Page1 + PG_DEFAULT
-    mov dword [8], Page2 + PG_DEFAULT
-    mov dword [12], Page3 + PG_DEFAULT
+    mov dword [0], _page0 + PG_DEFAULT
+    mov dword [4], _page1 + PG_DEFAULT
+    mov dword [8], _page2 + PG_DEFAULT
+    mov dword [12], _page3 + PG_DEFAULT
 
     ; set PTE
-    mov edi, Page3 + 4092
+    mov edi, _page3 + 4092
     mov eax, 0xfff000 + PG_DEFAULT
     std
 .next_pde:
@@ -131,45 +132,33 @@ SpuriousHandler equ _SpuriousHandler - $$
     iretd
 
 ;-------------------------------------
-; IDTR & GDTR
+; IDT & GDT
 ;-------------------------------------
-ALIGN 32
-IDTR    dw 256 * 8 - 1
-        dd LABEL_IDT
+ALIGN 4
+_idtr    dw 256 * 8 - 1
+        dd _idt
 
-GDTR    dw 256 * 8 - 1
-        dd LABEL_GDT
+_gdtr    dw 256 * 8 - 1
+        dd _gdt
 
-;-------------------------------------
-; IDT
-;-------------------------------------
-ALIGN 64
-LABEL_IDT:
+ALIGN 8
+_idt:
 %rep 256
-    Gate    SelectorFlatC, SpuriousHandler, 0, DA_386IGate
+    Gate        _sel_code, SpuriousHandler, 0, DA_386IGate
 %endrep
 
-;-------------------------------------
-; GDT
-;-------------------------------------
-ALIGN 64
-LABEL_GDT:
-LABEL_DESC_NULL:        Descriptor             0,                    0, 0
-LABEL_DESC_FLAT_C:      Descriptor             0,              0fffffh, DA_CR  | DA_32 | DA_LIMIT_4K
-LABEL_DESC_FLAT_RW:     Descriptor             0,              0fffffh, DA_DRW | DA_32 | DA_LIMIT_4K
-LABEL_DESC_VIDEO:       Descriptor       0B8000h,               0ffffh, DA_DRW | DA_DPL3
-%rep 252
+_gdt:
+_gd_null:       Descriptor        0,         0, 0
+_gd_code:       Descriptor        0,   0fffffh, DA_CR  | DA_32 | DA_LIMIT_4K
+_gd_data:       Descriptor        0,   0fffffh, DA_DRW | DA_32 | DA_LIMIT_4K
+_gd_video:      Descriptor  0B8000h,    0ffffh, DA_DRW | DA_DPL3
+_gd_tss:        Descriptor        0,       67h, DA_386TSS
+%rep 251
     Descriptor  0, 0, 0
 %endrep
 
-; selectors
-SelectorFlatC       equ LABEL_DESC_FLAT_C   - LABEL_GDT
-SelectorFlatRW      equ LABEL_DESC_FLAT_RW  - LABEL_GDT
-SelectorVideo       equ LABEL_DESC_VIDEO    - LABEL_GDT + SA_RPL3
-
-;-------------------------------------
-; Kernel Stack
-;-------------------------------------
-times   100h    db  0
-SETUP_STACKTOP  equ $ ; 栈顶
+_sel_code        equ _gd_code - _gdt
+_sel_data        equ _gd_data - _gdt
+_sel_video       equ _gd_video - _gdt + SA_RPL3
+_sel_tss         equ _gd_tss - _gdt
 

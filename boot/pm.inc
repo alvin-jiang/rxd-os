@@ -7,37 +7,37 @@
 ; DA_: Descriptor Attribute
 
 ; G - Granularity
-DA_LIMIT_4K EQU     8000h
+DA_LIMIT_4K equ     8000h
 
 ; B/D - Default operation size
 ; 0 = 16-bit seg, 1 = 32-bit seg
-DA_32       EQU     4000h
+DA_32       equ     4000h
 
 ; DPL
-DA_DPL0     EQU     00h
-DA_DPL1     EQU     20h
-DA_DPL2     EQU     40h
-DA_DPL3     EQU     60h
+DA_DPL0     equ     00h
+DA_DPL1     equ     20h
+DA_DPL2     equ     40h
+DA_DPL3     equ     60h
 
 ; Type
 ; for Data-Segment
 ; R: Readable W: Writable A: Accessed
-DA_DR       EQU     90h
-DA_DRW      EQU     92h
-DA_DRWA     EQU     93h
+DA_DR       equ     90h
+DA_DRW      equ     92h
+DA_DRWA     equ     93h
 ; for Code-Segment
 ; C: Conforming R: Readable
-DA_C        EQU     98h
-DA_CR       EQU     9Ah
-DA_CC       EQU     9Ch
-DA_CCR      EQU     9Eh
+DA_C        equ     98h
+DA_CR       equ     9Ah
+DA_CC       equ     9Ch
+DA_CCR      equ     9Eh
 ; for System-Segment
-DA_LDT      EQU     82h
-DA_TaskGate EQU     85h
-DA_386TSS   EQU     89h
-DA_386CGate EQU     8Ch
-DA_386IGate EQU     8Eh
-DA_386TGate EQU     8Fh
+DA_LDT      equ     82h
+DA_TaskGate equ     85h
+DA_386TSS   equ     89h
+DA_386CGate equ     8Ch
+DA_386IGate equ     8Eh
+DA_386TGate equ     8Fh
 
 ;-------------------------------------
 ; DESCRIPTOR MARCOS
@@ -56,14 +56,14 @@ DA_386TGate EQU     8Fh
 ; SA_: Selector Attribute
 
 ; TI - Table Indicator
-SA_GDT      EQU 0
-SA_LDT      EQU 4
+SA_GDT      equ 0
+SA_LDT      equ 4
 
 ; RPL - Requested Privilege Level
-SA_RPL0     EQU 0
-SA_RPL1     EQU 1
-SA_RPL2     EQU 2
-SA_RPL3     EQU 3
+SA_RPL0     equ 0
+SA_RPL1     equ 1
+SA_RPL2     equ 2
+SA_RPL3     equ 3
 
 ;-------------------------------------
 ; GATE MARCOS

@@ -47,9 +47,9 @@ INIT_START:
     mov sp, 0xf000  ; 0x9f000 < 0x9fc00
 
     ; show "start booting..."
-    call    ClearScreen
+    call    _func_clear_screen
     mov bp, Msg_Boot
-    call    DispMsg
+    call    _func_disp_msg
 
     ; 0. get root device params
     call    GetRootDevParams
@@ -58,7 +58,7 @@ INIT_START:
     ; show "loading setup..."
     push es
     mov bp, Msg_Setup
-    call    DispMsg
+    call    _func_disp_msg
     mov ax, SETUP_SEGMENT
     mov es, ax
     mov bx, 0
@@ -69,7 +69,7 @@ INIT_START:
     ; 2. load kernel.bin into memory
     ; show "loading kernel..."
     mov bp, Msg_Kernel
-    call    DispMsg
+    call    _func_disp_msg
     mov ax, KERNEL_SEGMENT
     mov es, ax
     mov bx, 0
@@ -97,9 +97,9 @@ INIT_START:
 ;-------------------------------------
 ; Variables
 ;-------------------------------------
-; used in DispMsg()
+; used in _func_disp_msg()
 bPrintToLine        db  0 ; print to which line?
-DispMsgLen          equ 17
+_func_disp_msgLen          equ 17
 Msg_Boot:           db  "booting...       "
 Msg_Setup:          db  "loading setup... "
 Msg_Kernel:         db  "loading kernel..."
@@ -115,7 +115,7 @@ bHeads              db 0 ; how many heads?
 ;-------------------------------------
 ; Functions
 ;-------------------------------------
-ClearScreen:
+_func_clear_screen:
     mov ax, 0600h       ; AH - 06h, Scroll Up Window
                         ; AL - 00h, blank window
     mov bx, 0700h       ; BH - 07h, black background, white character
@@ -126,7 +126,7 @@ ClearScreen:
     int 10h             ; BIOS video service
     ret
 
-DispMsg:
+_func_disp_msg:
 ; in:
 ;   es:bp - Message Offset
 
@@ -137,7 +137,7 @@ DispMsg:
                                 ; AL - 01h, update cursor
     mov bx, 0007h               ; BH - page number
                                 ; BL - 07h, black background, white character
-    mov cx, DispMsgLen          ; CX - number of chars to write
+    mov cx, _func_disp_msgLen          ; CX - number of chars to write
     mov dh, byte [bPrintToLine] ; DH - row to write
     mov dl, 00h                 ; DL - column to write
     inc byte [bPrintToLine]

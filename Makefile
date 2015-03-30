@@ -50,7 +50,7 @@ sysimg = rxdos.img
 .PHONY : rebuild source clean
 
 # Default starting position
-$(sysimg) : $(bootprog) $(kernelprog) $(szfiles)
+$(sysimg) : clean $(bootprog) $(kernelprog) $(szfiles)
 	dd if=boot/boot.bin of=$@ bs=512 count=1 conv=notrunc
 	dd if=.progsz.0 of=$@ bs=1 seek=508 count=2 conv=notrunc
 	dd if=boot/setup.bin of=$@ bs=512 conv=notrunc seek=1 count=`awk '{printf "%s", $$2}' .progsz`

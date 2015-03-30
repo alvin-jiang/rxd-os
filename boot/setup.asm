@@ -102,9 +102,6 @@ SETUP_START:
 ;-------------------------------------
 ; Variables
 ;-------------------------------------
-wEXMemSizeLow       dw  0 ; extend memory (>= 1 MB) size in KB
-wEXMemSizeHigh      dw  0 ; extend memory (>= 1 MB) size in KB
-
 ; used in PrintLocalMsg()
 Msg_Setup:          db  "setup...", 0
 Msg_CheckParams:    db  "check system params...", 0
@@ -161,42 +158,38 @@ CheckMemory:
     jmp $
 
 Reset8259A:
-    mov al, 011h
-    out 020h, al    ; 主8259, ICW1.
+    mov al, 011h    ; initialization sequence
+    out 020h, al    ; send it to 8259A-1
     call    io_delay
 
-    out 0A0h, al    ; 从8259, ICW1.
+    out 0A0h, al    ; and to 8259A-2
     call    io_delay
 
-    mov al, 020h    ; IRQ0 对应中断向量 0x20
-    out 021h, al    ; 主8259, ICW2.
+    mov al, 020h    ; start of hardware int's (IR0 = 0x20)
+    out 021h, al
     call    io_delay
 
-    mov al, 028h    ; IRQ8 对应中断向量 0x28
-    out 0A1h, al    ; 从8259, ICW2.
+    mov al, 028h    ; start of hardware int's 2 (IR8 = 0x28)
+    out 0A1h, al
     call    io_delay
 
-    mov al, 004h    ; IR2 对应从8259
-    out 021h, al    ; 主8259, ICW3.
+    mov al, 004h    ; IR2 = interrupt from 8259A-2
+    out 021h, al
+    call    io_delay
+    mov al, 002h
+    out 0A1h, al
     call    io_delay
 
-    mov al, 002h    ; 对应主8259的 IR2
-    out 0A1h, al    ; 从8259, ICW3.
+    mov al, 001h    ; 8086 mode for both
+    out 021h, al
+    call    io_delay
+    out 0A1h, al
     call    io_delay
 
-    mov al, 001h
-    out 021h, al    ; 主8259, ICW4.
+    mov    al, 0xff ; mask off all interrupts for now
+    out 021h, al
     call    io_delay
-
-    out 0A1h, al    ; 从8259, ICW4.
-    call    io_delay
-
-    mov    al, 11111111b   ; 屏蔽主8259所有中断
-    out 021h, al    ; 主8259, OCW1.
-    call    io_delay
-
-    mov al, 11111111b   ; 屏蔽从8259所有中断
-    out 0A1h, al    ; 从8259, OCW1.
+    out 0A1h, al
     call    io_delay
 
     ret

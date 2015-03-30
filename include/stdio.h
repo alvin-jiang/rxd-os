@@ -9,9 +9,12 @@
 #ifndef __STDIO_H__
 #define __STDIO_H__
 
-void printk(const char *s);
-//int printf(const char *fmt, ...);
-//int vsprintf(char *buf, const char *fmt, va_list args);
+// klib.asm
+void printk (const char *s);
+
+// printf.c
+int printf (const char *fmt, ...);
+int sprintf (char * s, const char * fmt, ...);
 
 #endif
 
