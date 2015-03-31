@@ -16,5 +16,7 @@ typedef unsigned char BYTE;
 typedef unsigned int size_t;
 typedef char * va_list;
 
+#define NULL ((void *)0)
+
 #endif
 

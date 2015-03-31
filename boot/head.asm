@@ -12,10 +12,10 @@
 ; 4. jump to main.c
 
 extern main, printk
-global _start, _gdt, _idt
+global _start, _gdt, _idt, _tss
 
 %include    "pm.inc"
-STACK_TOP   equ 0x90000
+KERNEL_STACK_TOP   equ 0x90000
 
 [SECTION .text]
 ALIGN 4
@@ -32,7 +32,7 @@ _start:
     mov es, ax
     mov fs, ax
     mov ss, ax
-    mov esp, STACK_TOP
+    mov esp, KERNEL_STACK_TOP
     lgdt [_gdtr]
 
     ; 2. reset segment regs, check A20, setup IDT
@@ -43,9 +43,10 @@ _start:
     mov es, ax
     mov fs, ax
     mov ss, ax
-    mov esp, STACK_TOP
+    mov esp, KERNEL_STACK_TOP
     call    _func_check_a20
     call    _func_setup_idt
+    call    _func_setup_tss
 
     jmp _sel_code:_after_page_table
 
@@ -92,6 +93,21 @@ _func_setup_idt:
     lidt [_idtr]
     ret
 
+_func_setup_tss:
+    mov ax, ds
+    mov [_tss + 8], ax          ; ss0
+    mov word [_tss + 102], 104  ; iobase
+
+    mov eax, _tss
+    mov [_gd_tss + 2], ax
+    shr eax, 16
+    mov [_gd_tss + 4], al
+    mov [_gd_tss + 7], ah
+
+    mov ax, _sel_tss
+    ltr ax
+    ret
+
 _func_setup_paging:
     ; zero memory [0x0000, 0x5000)
     mov ecx, 1024 * 5
@@ -132,13 +148,17 @@ SpuriousHandler equ _SpuriousHandler - $$
     iretd
 
 ;-------------------------------------
-; IDT & GDT
+; TSS & IDT & GDT
 ;-------------------------------------
 ALIGN 4
-_idtr    dw 256 * 8 - 1
+_tss:
+times   104 db 0
+
+ALIGN 4
+_idtr   dw 256 * 8 - 1
         dd _idt
 
-_gdtr    dw 256 * 8 - 1
+_gdtr   dw 256 * 8 - 1
         dd _gdt
 
 ALIGN 8

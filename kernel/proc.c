@@ -1,13 +1,6 @@
 #include "head.h"
 #include "proc.h"
 
-extern struct desc_struct *_gdt;
-extern struct gate_struct *_idt;
-
-struct desc_struct * gdt = (struct desc_struct *)&_gdt;
-struct gate_struct * idt = (struct gate_struct *)&_idt;
-struct tss_struct tss;
-
 union task_union {
     struct task_struct task;
     char stack[4096];
@@ -30,17 +23,6 @@ static inline void set_limit(struct desc_struct *p_desc, DWORD limit)
     p_desc->high = (p_desc->high & 0xfff0ffff) | (limit & 0xf0000);
 }
 
-void set_tss_desc(struct task_struct *p_task)
-{
-    // assert((p_task->rts.ss & 0xffff0000) == 0)
-    memset(&tss, 0, sizeof(tss));
-    tss.ss0 = p_task->rts.ss;
-    tss.esp0 = (DWORD)&p_task->rts + sizeof(struct rts_struct); // end of rts
-    // TODO: what iobase means?
-    tss.iobase = sizeof(tss);
-    set_base(&gdt[4], (DWORD)&tss);
-}
-
 void set_ldt_desc(struct task_struct *p_task)
 {
     printf("pid = %d\n", p_task->pid);
@@ -56,8 +38,10 @@ void set_ldt_desc(struct task_struct *p_task)
 
 void proc_init()
 {
-    set_tss_desc(&init_task.task);
+    // set_tss_desc(&init_task.task);
     set_ldt_desc(&init_task.task);
+
+    // set timer_interrupt
 }
 
 void init()
@@ -65,4 +49,26 @@ void init()
     printf("hello, proc init()!\n");
     while(1);
 }
+
+// void schedule()
+// {
+//     if( current_task->next != current_task )
+//         current_task = current_task->next;
+// }
+
+// void clock_interrupt(int int_nr)
+// {
+//     schedule();
+// }
+
+// void clock_init()
+// {
+//     // init 8253 PIT
+//     // out_byte(TIMER_MODE, RATE_GENERATOR);
+//     // out_byte(TIMER0, (u8) (TIMER_FREQ/HZ) );
+//     // out_byte(TIMER0, (u8) ((TIMER_FREQ/HZ) >> 8));
+
+//     // set_int_handler(INT_REQ_CLOCK, clock_interrupt);
+//     // enable_int(INT_REQ_CLOCK);
+// }
 
