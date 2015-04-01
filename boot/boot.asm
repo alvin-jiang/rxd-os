@@ -26,7 +26,7 @@ INIT_SEGMENT        equ 0x9000
 SETUP_SEGMENT       equ 0x9020
 KERNEL_SEGMENT      equ 0x1000
 
-    ; move self from 0x7c00 -> 0x9000
+    ; move self from 0x7c00 -> 0x90000
     cld
     mov ax, 0x07c0
     mov ds, ax
@@ -151,6 +151,7 @@ GetRootDevParams: ; support floppy & hard disk
     int 13h                     ; BIOS low level disk services
     jc GetRootDevParams
     mov [bSecPerTrk], cl
+    inc dh
     mov [bHeads], dh
     ret
 
@@ -160,6 +161,9 @@ ReadRootDevSector:
 ;   cl - Count to Read
 ;   es:bx - Result Output
 
+    push es
+.next_read:
+    push ax ; save start sector
     mov [bSecReadCnt], cl
 
     mov dl, [bSecPerTrk]
@@ -175,21 +179,38 @@ ReadRootDevSector:
 
     ; cylinder number = (LBA / bSecPerTrk) / bHeads
     mov ch, al                  ; CH - low eight bits of cylinder number
-    ; head number = (LBA / bSecPerTrk) / bHeads
+    ; head number = (LBA / bSecPerTrk) % bHeads
     mov dh, ah                  ; DH - head number
 
     mov dl, ROOT_DEV            ; DL - drive number (bit 7 set for hard disk)
 
-.retry:
-    mov ah, 02h                 ; AH - 02h, Read Sector(s) Into Memory
     mov al, [bSecReadCnt]       ; AL - number of sectors to read (>0)
+    cmp al, 64 ; 64 sectors max per read
+    jle .do_read
+    mov al, 64
+
+.do_read:
+    mov ah, 02h                 ; AH - 02h, Read Sector(s) Into Memory
     int 13h                     ; BIOS low level disk services
-    jnc .succeed
-    mov ah, 00h
-    int 13h
-    jmp .retry
-.succeed:
+    jc .do_read
+
+    sub byte [bSecReadCnt], al
+    mov cl, [bSecReadCnt]   ; set next read count
+    movzx ax, al
+    pop dx ; restore start sector
+    add ax, dx              ; set next read start sector
+    mov dx, es
+    add dx, 0x800
+    mov es, dx
+    
+    cmp cl, 0
+    jne .next_read
+
+    pop es
     ret
+    ; reset read
+    ;mov ah, 00h
+    ;int 13h
 
 KillMotor: ; kill floppy disk motor
     push dx

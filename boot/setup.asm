@@ -36,7 +36,7 @@ SETUP_START:
     call    PrintLocalMsg
 
 ; read & save extend memory size
-    call    CheckMemory
+    call    _func_check_mem
     mov word [2], ax
     mov word [4], bx
 
@@ -79,11 +79,12 @@ SETUP_START:
     pop ds
 
 ; fix 8259A compatibility problems
-    call    Reset8259A
+    call    _func_reset_8259A
 
-; set temporary GDT, open A20, enter protected-mode
-    ; load GDT
-    lgdt [GdtPtr]
+; load temporary GDT, open A20, enter protected-mode
+    ; load temporary GDT, so we can enter protected-mode
+    ; and jump to head.asm, we will reload GDT in there
+    lgdt [_tmp_gdtr]
     ; enable A20, so we can access memory >= 1 MB
     in  al, 92h
     or  al, 00000010b
@@ -93,11 +94,10 @@ SETUP_START:
     or  eax, 1
     mov cr0, eax
 
-; jump to kernel head
+; jump to kernel
     ; note address translation has already changed from now,
     ; also note this jmp is a 32-bit instruction in 16-bit code segment.
-    jmp dword SelectorFlatC:0x0000
-
+    jmp dword _tmp_sel_code:0x0000
 
 ;-------------------------------------
 ; Variables
@@ -106,32 +106,26 @@ SETUP_START:
 Msg_Setup:          db  "setup...", 0
 Msg_CheckParams:    db  "check system params...", 0
 Msg_MemSize:        db  "extend memory size = 0x", 0
-Msg_Printk:          db  "hello printk...", 0
+Msg_Printk:         db  "hello printk...", 0
 
 ;-------------------------------------
 ; Temporary GDT
 ;-------------------------------------
-LABEL_GDT:
-LABEL_DESC_NULL:        Descriptor             0,                    0, 0
-LABEL_DESC_FLAT_C:      Descriptor             0,              0fffffh, DA_CR  | DA_32 | DA_LIMIT_4K
-LABEL_DESC_FLAT_RW:     Descriptor             0,              0fffffh, DA_DRW | DA_32 | DA_LIMIT_4K
-LABEL_DESC_VIDEO:       Descriptor       0B8000h,               0ffffh, DA_DRW | DA_DPL3
+_tmp_gdt:
+_tmp_gd_null:   Descriptor  0,        0, 0
+_tmp_gd_code:   Descriptor  0,  0fffffh, DA_CR  | DA_32 | DA_LIMIT_4K
+_tmp_gd_data:   Descriptor  0,  0fffffh, DA_DRW | DA_32 | DA_LIMIT_4K
 
-GdtLen  equ $ - LABEL_GDT
-GdtPtr  dw  GdtLen - 1
-        dd  SETUP_SEGMENT * 16 + LABEL_GDT
+_tmp_gdtr   dw  3 * 8 - 1
+            dd  SETUP_SEGMENT * 16 + _tmp_gdt
 
-;-------------------------------------
-; Temporary GDT Selector
-;-------------------------------------
-SelectorFlatC       equ LABEL_DESC_FLAT_C   - LABEL_GDT
-SelectorFlatRW      equ LABEL_DESC_FLAT_RW  - LABEL_GDT
-SelectorVideo       equ LABEL_DESC_VIDEO    - LABEL_GDT + SA_RPL3
+_tmp_sel_code   equ _tmp_gd_code - _tmp_gdt
+_tmp_sel_data   equ _tmp_gd_data - _tmp_gdt
 
 ;-------------------------------------
 ; Functions
 ;-------------------------------------
-CheckMemory:
+_func_check_mem:
 ; out:
 ;   ax - low 16-bit of extend memory size in KB
 ;   bx - high 16-bit
@@ -157,7 +151,7 @@ CheckMemory:
 .error:
     jmp $
 
-Reset8259A:
+_func_reset_8259A:
     mov al, 011h    ; initialization sequence
     out 020h, al    ; send it to 8259A-1
     call    io_delay
@@ -297,4 +291,5 @@ disp_word_3:
 
     mov word [0], dx
     ret
+
 

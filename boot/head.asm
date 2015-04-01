@@ -15,7 +15,6 @@ extern main, printk
 global _start, _gdt, _idt, _tss
 
 %include    "pm.inc"
-KERNEL_STACK_TOP   equ 0x90000
 
 [SECTION .text]
 ALIGN 4
@@ -24,7 +23,11 @@ ALIGN 4
 _start:
     ; we are in protected-mode now
 
-    ; 1. reset GDT
+; reload GDT, segment regs
+    ; set es temporarily to load new GDT
+    mov ax, 0x10
+    mov es, ax
+    lgdt [es:_gdtr]
     mov ax, _sel_video
     mov gs, ax
     mov ax, _sel_data
@@ -32,19 +35,12 @@ _start:
     mov es, ax
     mov fs, ax
     mov ss, ax
-    mov esp, KERNEL_STACK_TOP
-    lgdt [_gdtr]
+    mov esp, 0x90000 ; we store boot params on memory >= 0x90000
 
-    ; 2. reset segment regs, check A20, setup IDT
-    mov ax, _sel_video
-    mov gs, ax
-    mov ax, _sel_data
-    mov ds, ax
-    mov es, ax
-    mov fs, ax
-    mov ss, ax
-    mov esp, KERNEL_STACK_TOP
+; make sure A20 is opened
     call    _func_check_a20
+
+; setup IDT, TSS
     call    _func_setup_idt
     call    _func_setup_tss
 
@@ -61,8 +57,8 @@ _page3:
 
 times   0x5000-($-$$)  db  0
 _after_page_table:
-    ; we can now safely override the code starting at 0x0000
-    ; 3. setup Paging
+; we can now safely override the code starting at 0x0000
+; setup Paging
     call    _func_setup_paging
 
     ; 4. jump to main.c
