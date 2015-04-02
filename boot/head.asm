@@ -12,6 +12,7 @@
 ; 4. jump to main.c
 
 extern main, printk
+extern _hint32_clock
 global _start, _gdt, _idt, _tss
 
 %include    "pm.inc"
@@ -61,7 +62,10 @@ _after_page_table:
 ; setup Paging
     call    _func_setup_paging
 
-    ; 4. jump to main.c
+; open interrupt! out of control!
+    sti
+
+; jump to main.c
     push 0 ; arg data
     push 0 ; argv
     push 0 ; argc
@@ -87,6 +91,12 @@ _func_check_a20:
 
 _func_setup_idt:
     lidt [_idtr]
+
+    mov eax, _hint32_clock
+    mov [_idt + 8 * 32], ax
+    shr eax, 16
+    mov [_idt + 8 * 32 + 6], ax
+
     ret
 
 _func_setup_tss:
@@ -135,13 +145,12 @@ _func_setup_paging:
     mov cr0, eax
     ret
 
-_SpuriousHandler:
-SpuriousHandler equ _SpuriousHandler - $$
+_hint_null:
     mov ah, 0Ch
     mov al, '!'
     mov [gs:((80 * 0 + 75) * 2)], ax
     jmp $
-    iretd
+_hint_null_offset   equ _hint_null - $$
 
 ;-------------------------------------
 ; TSS & IDT & GDT
@@ -160,7 +169,7 @@ _gdtr   dw 256 * 8 - 1
 ALIGN 8
 _idt:
 %rep 256
-    Gate        _sel_code, SpuriousHandler, 0, DA_386IGate
+    Gate        _sel_code, _hint_null_offset, 0, DA_386IGate
 %endrep
 
 _gdt:

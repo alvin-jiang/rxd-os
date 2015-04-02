@@ -68,7 +68,7 @@ SA_RPL3     equ 3
 ;-------------------------------------
 ; GATE MARCOS
 
-; Gate      Selector(dw), Offset(dd), DCount(db), Attr(db)
+; Gate      Selector(dw), Offset(dd), ParamCount(db), Attr(db)
 %macro Gate 4
     dw  (%2 & 0FFFFh)            
     dw  %1               

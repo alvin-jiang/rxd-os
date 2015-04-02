@@ -18,7 +18,7 @@ printk:
     mov ebp, esp
 
     mov esi, [ebp + 8]
-    mov dx, word [0x90000]   ; dx = cursor pos
+    mov dx, word [0x90000]  ; dx = cursor pos
     mov al, 80
     mul dh
     add al, dl
@@ -48,6 +48,9 @@ printk:
 .print:
     mov [gs:eax], cl
     add eax, 2
+        cmp eax, 80 * 25 * 2
+        jl .next
+        mov dx, 0x0f00
 .next:
     inc esi
     inc dl

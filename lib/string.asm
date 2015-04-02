@@ -84,8 +84,13 @@ memset:
 ; char *  strcpy(char * destination, const char * source);
 ;-------------------------------------
 strcpy:
-    mov esi, [esp + 12]
-    mov edi, [esp + 8]
+    push ebp
+    mov ebp, esp
+    push esi
+    push edi
+
+    mov esi, [ebp + 12]
+    mov edi, [ebp + 8]
 .loop:
     cmp byte [esi], 0
     je .end
@@ -96,14 +101,22 @@ strcpy:
     jmp .loop
 .end:
     mov eax, [esp + 8]
+
+    pop edi
+    pop esi
+    pop ebp
     ret
 
 ;-------------------------------------
 ; size_t  strlen(const char * str);
 ;-------------------------------------
 strlen:
+    push ebp
+    mov ebp, esp
+    push esi
+
     mov eax, 0
-    mov esi, [esp + 8]
+    mov esi, [ebp + 8]
 .next:
     cmp byte [esi], 0
     je .end
@@ -111,6 +124,8 @@ strlen:
     inc eax
     jmp .next
 .end:
+    pop esi
+    pop ebp
     ret
 
 

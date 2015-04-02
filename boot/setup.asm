@@ -106,7 +106,7 @@ SETUP_START:
 Msg_Setup:          db  "setup...", 0
 Msg_CheckParams:    db  "check system params...", 0
 Msg_MemSize:        db  "extend memory size = 0x", 0
-Msg_Printk:         db  "hello printk...", 0
+Meg_Printk:         db  "hello printk...", 0
 
 ;-------------------------------------
 ; Temporary GDT
@@ -155,7 +155,6 @@ _func_reset_8259A:
     mov al, 011h    ; initialization sequence
     out 020h, al    ; send it to 8259A-1
     call    io_delay
-
     out 0A0h, al    ; and to 8259A-2
     call    io_delay
 

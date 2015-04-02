@@ -5,17 +5,28 @@
 ; @created time: 2015-03-28
 ;
 
-extern current_task, exception_handler, tss
+extern _tss
+
+; exception & interrupt
+extern exception_handler
+extern intcb_table, int_reenter, current_task
 
 global enable_int, disable_int
 
-global restart
+global back_to_user_mode
+
+global _hint32_clock
+
+
 global divide_error, debug, nmi, breakpoint, overflow, bounds, invalid_op
 global device_not_available, double_fault, coprocessor_segment_overrun
 global invalid_TSS, segment_not_present, stack_segment, general_protection
 global page_fault, reserved, coprocessor_error
 
 KERNEL_STACK_TOP    equ 0x90000
+GDT_IDX_FIRST_LDT   equ 5
+RTS_IDX_RETADDR     equ 48
+
 INT_M_CTLMASK equ 0x21
 INT_S_CTLMASK equ 0xa1
 
@@ -23,63 +34,86 @@ INT_S_CTLMASK equ 0xa1
 ALIGN 4
 [BITS 32]
 
-restart:
-    mov esp, [current_task]     ; exp -> task_struct
+back_to_user_mode:
+    mov esp, [current_task]     ; esp -> task_struct
+
     ; load ldt
+    ; ldt index = GDT_IDX_FIRST_LDT + pid
     mov eax, [esp]
-    add eax, 5 ; first ldt pos
+    add eax, GDT_IDX_FIRST_LDT
     shl eax, 3
     lldt ax
-    ; set tss esp0
-    add esp, 8                  ; exp -> rts
-    lea eax, [esp + 72]
-    mov [tss + 4], eax
+    
+    add esp, 8                  ; esp -> rts
 
-restart_reenter:
+    ; DEBUG
+    mov ax, 24
+    mov gs, ax
+    mov byte [gs:80], 'k'
+    mov byte [gs:84], 'U'
+    inc byte [gs:86]
+
+    ; set tss esp0
+    lea eax, [esp + 72]
+    mov [_tss + 4], eax
+back_to_user_mode_reenter:
+    dec dword [int_reenter]
     pop gs
     pop fs
     pop es
     pop ds
     popad
-
     ; skip retaddr
     add esp, 4
     ; ring0 -> ring3, trigger stack switch
     iretd
 
-
-save:
+; save regs & switch to kernel stack (set esp)
+enter_kernel_mode:
     pushad
-    push    ds
-    push    es
-    push    fs
-    push    gs
+    push ds
+    push es
+    push fs
+    push gs
 
-    mov     dx, ss
-    mov     ds, dx
-    mov     es, dx
-    mov     esi, esp
+    mov dx, ss
+    mov ds, dx
+    mov es, dx
+    mov fs, dx
+    ; mov gs, dx
+    mov esi, esp                ; esi -> rts
 
-    ;inc     dword [k_reenter]
-    ;cmp     dword [k_reenter], 0
-    jne     .1
-    ;mov     esp, KERNEL_STACK_TOP
-    push    restart
-    ;jmp     [esi + RETADR - P_STACKBASE]
-.1:
-    push    restart_reenter
-    ;jmp     [esi + RETADR - P_STACKBASE]
+    inc     dword [int_reenter]
+    cmp     dword [int_reenter], 0
+    jne     .already_in_kernel_mode
+    ; switch to kernel stack
+    mov     esp, KERNEL_STACK_TOP
+    push    back_to_user_mode
+    jmp     [esi + RTS_IDX_RETADDR]
+.already_in_kernel_mode:
+    push    back_to_user_mode_reenter
+    jmp     [esi + RTS_IDX_RETADDR]
+
 
 %macro  hwint_master    1
-    ret
+    mov al, 0x20
+    out 0x20, al
+    iretd
 %endmacro
 
 ; Interrupt routines
 ALIGN   16
-hwint00:        ; irq 0 (the clock).
-    call    save
+_hint32_clock:        ; irq 0 (the clock)
+    call    enter_kernel_mode
 
-    ; disable current irq
+    ; DEBUG
+    mov ax, 24
+    mov gs, ax
+    mov byte [gs:80], 'K'
+    mov byte [gs:84], 'u'
+    inc byte [gs:82]
+
+    ; disable current interrupt
     in  al, 0x21
     or  al, 1
     out 0x21, al
@@ -87,16 +121,18 @@ hwint00:        ; irq 0 (the clock).
     mov al, 0x20
     out 0x20, al
 
-    sti
-    push    0
-    ;call    [irq_table]
-    pop ecx
-    cli
+    ;sti
+    push 0
+    call    [intcb_table]
+    pop ecx             ; TODO: store interrupt number in ECX ??? why?
+    ;cli
 
-    ; enable current irq
+    ; enable current interrupt
     in  al, 0x21
     and al, ~(1)
     out 0x21, al
+    ; return to back_to_user_mode or back_to_user_mode_reenter,
+    ; depending on "int_reenter"
     ret
 
 ALIGN   16
@@ -237,6 +273,57 @@ _exception:
 
 
 
+disable_int:
+        mov     ecx, [esp + 4]          ; irq
+        pushf
+        cli
+        mov     ah, 1
+        rol     ah, cl                  ; ah = (1 << (irq % 8))
+        cmp     cl, 8
+        jae     disable_8               ; disable irq >= 8 at the slave 8259
+disable_0:
+        in      al, INT_M_CTLMASK
+        test    al, ah
+        jnz     dis_already             ; already disabled?
+        or      al, ah
+        out     INT_M_CTLMASK, al       ; set bit at master 8259
+        popf
+        mov     eax, 1                  ; disabled by this function
+        ret
+disable_8:
+        in      al, INT_S_CTLMASK
+        test    al, ah
+        jnz     dis_already             ; already disabled?
+        or      al, ah
+        out     INT_S_CTLMASK, al       ; set bit at slave 8259
+        popf
+        mov     eax, 1                  ; disabled by this function
+        ret
+dis_already:
+        popf
+        xor     eax, eax                ; already disabled
+        ret
+
+enable_int:
+    mov     ecx, [esp + 4]          ; irq
+    pushf
+    cli
+    mov     ah, ~1
+    rol     ah, cl                  ; ah = ~(1 << (irq % 8))
+    cmp     cl, 8
+    jae     enable_8                ; enable irq >= 8 at the slave 8259
+enable_0:
+    in      al, INT_M_CTLMASK
+    and     al, ah
+    out     INT_M_CTLMASK, al       ; clear bit at master 8259
+    popf
+    ret
+enable_8:
+    in      al, INT_S_CTLMASK
+    and     al, ah
+    out     INT_S_CTLMASK, al       ; clear bit at slave 8259
+    popf
+    ret
 
 
 

@@ -34,14 +34,14 @@ bootsrc = ./boot/boot.asm ./boot/setup.asm
 bootprog = $(bootsrc:.asm=.bin)
 
 kernelsrc = ./boot/head.asm \
-	$(wildcard ./kernel/*.c) $(wildcard ./kernel/*.asm)
+	$(wildcard ./kernel/*.asm) $(wildcard ./kernel/*.c)
 kernelobjs = ./boot/head.o \
-	$(patsubst %.c, %.o, $(wildcard ./kernel/*.c)) \
-	$(patsubst %.asm, %.o, $(wildcard ./kernel/*.asm))
+	$(patsubst %.asm, %.o, $(wildcard ./kernel/*.asm)) \
+	$(patsubst %.c, %.o, $(wildcard ./kernel/*.c))	
 
-libsrc = $(wildcard ./lib/*.c) $(wildcard ./lib/*.asm)
-libobjs = $(patsubst %.c, %.o, $(wildcard ./lib/*.c)) \
-	$(patsubst %.asm, %.o, $(wildcard ./lib/*.asm))
+libsrc = $(wildcard ./lib/*.asm) $(wildcard ./lib/*.c)
+libobjs = $(patsubst %.asm, %.o, $(wildcard ./lib/*.asm)) \
+	$(patsubst %.c, %.o, $(wildcard ./lib/*.c))
 
 kernelprog = kernel.bin
 sysimg = rxdos.img
@@ -50,7 +50,7 @@ sysimg = rxdos.img
 .PHONY : rebuild source clean
 
 # Default starting position
-$(sysimg) : clean $(bootprog) $(kernelprog) $(szfiles)
+$(sysimg) : $(bootprog) $(kernelprog) $(szfiles)
 	dd if=boot/boot.bin of=$@ bs=512 count=1 conv=notrunc
 	dd if=.progsz.0 of=$@ bs=1 seek=508 count=2 conv=notrunc
 	dd if=boot/setup.bin of=$@ bs=512 conv=notrunc seek=1 count=`awk '{printf "%s", $$2}' .progsz`

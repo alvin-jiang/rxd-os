@@ -31,12 +31,16 @@ struct tss_struct
 #define BOOT_PARAM_CURSOR (*(unsigned short *)0x90000)
 #define BOOT_PARAM_MEM_SIZE (*(unsigned long *)0x90002)
 
+#define PAGE_SIZE 4096
+
 // GDT, LDT
+#define GDT_IDX_FIRST_LDT 5
 #define INIT_IDT_DESC {0x0, 0x00408200}
 
 // IDT, Interrupt, Exception
 #define INT_REQ_NR 16
-#define INT_REQ_CLOCK           0X0
+#define NR_INT_CLOCK            0x20
+
 #define EXCEPTION_DIVIDE        0x0
 #define EXCEPTION_DEBUG         0x1
 #define EXCEPTION_NMI           0x2
@@ -58,11 +62,13 @@ extern struct desc_struct *gdt;
 extern struct gate_struct *idt;
 extern struct tss_struct *tss;
 
-typedef void (*int_handler) (int int_nr);
-extern int_handler inthdl_table[];
+/* interrupt */
+typedef void (*int_callback) (int int_nr);
+extern int_callback intcb_table[];
+extern int int_reenter;
 
 // head.c
-void set_int_handler(int int_nr, int_handler hdl);
+void set_int_callback(int int_nr, int_callback hdl);
 // system.asm
 void enable_int(int int_nr);
 void disable_int(int int_nr);
