@@ -17,8 +17,8 @@ global strlen
 ; void *  memcpy(void * dst, const void * src, size_t num);
 ;-------------------------------------
 memcpy:
-    cmp byte [esp + 12], 0
-    jz .end
+    cmp dword [esp + 12], 0
+    je .end
 
     push    ebp
     mov ebp, esp
@@ -54,8 +54,8 @@ memmove:
 ; void *  memset(void * ptr, int value, size_t num);
 ;-------------------------------------
 memset:
-    cmp byte [esp + 12], 0
-    jz .end
+    cmp dword [esp + 12], 0
+    je .end
 
     push    ebp
     mov ebp, esp

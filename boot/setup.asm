@@ -106,11 +106,11 @@ SETUP_START:
 Msg_Setup:          db  "setup...", 0
 Msg_CheckParams:    db  "check system params...", 0
 Msg_MemSize:        db  "extend memory size = 0x", 0
-Meg_Printk:         db  "hello printk...", 0
 
 ;-------------------------------------
 ; Temporary GDT
 ;-------------------------------------
+ALIGN 8
 _tmp_gdt:
 _tmp_gd_null:   Descriptor  0,        0, 0
 _tmp_gd_code:   Descriptor  0,  0fffffh, DA_CR  | DA_32 | DA_LIMIT_4K

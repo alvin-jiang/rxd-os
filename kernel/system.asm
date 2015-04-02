@@ -92,6 +92,7 @@ enter_kernel_mode:
     jmp     [esi + RTS_IDX_RETADDR]
 .already_in_kernel_mode:
     push    back_to_user_mode_reenter
+    mov byte [gs:100], 'R' ; DEBUG
     jmp     [esi + RTS_IDX_RETADDR]
 
 
@@ -121,11 +122,11 @@ _hint32_clock:        ; irq 0 (the clock)
     mov al, 0x20
     out 0x20, al
 
-    ;sti
+    sti
     push 0
     call    [intcb_table]
     pop ecx             ; TODO: store interrupt number in ECX ??? why?
-    ;cli
+    cli
 
     ; enable current interrupt
     in  al, 0x21
