@@ -28,8 +28,8 @@ struct tss_struct
 };
 
 // boot params
-#define BOOT_PARAM_CURSOR (*(unsigned short *)0x90000)
-#define BOOT_PARAM_MEM_SIZE (*(unsigned long *)0x90002)
+#define BOOT_PARAM_CURSOR (*(WORD *)0x90000)
+#define BOOT_PARAM_MEM_SIZE (*(DWORD *)0x90002)
 
 #define PAGE_SIZE 4096
 

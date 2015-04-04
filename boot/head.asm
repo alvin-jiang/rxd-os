@@ -12,7 +12,7 @@
 ; 4. jump to main.c
 
 extern main, printk
-extern _hint32_clock
+extern _hint32_clock, _hint14_page_fault
 global _start, _gdt, _idt, _tss
 
 %include    "pm.inc"
@@ -91,6 +91,11 @@ _func_check_a20:
 
 _func_setup_idt:
     lidt [_idtr]
+
+    mov eax, _hint14_page_fault
+    mov [_idt + 8 * 14], ax
+    shr eax, 16
+    mov [_idt + 8 * 14 + 6], ax
 
     mov eax, _hint32_clock
     mov [_idt + 8 * 32], ax

@@ -35,21 +35,10 @@ void set_ldt_desc (struct task_struct *p_task)
     memcpy(&gdt[GDT_IDX_FIRST_LDT + p_task->pid], &ldt_desc, sizeof(struct desc_struct));
 }
 
-static union task_union task2 = {0};
-
 void sched_init ()
 {
     // set task 0
     set_ldt_desc(&init_task.task);
-    // set test task 1
-    memcpy(&task2.task, &init_task.task, PAGE_SIZE);
-    task2.task.pid = 1;
-    task2.task.rts.eip = (DWORD)&init2;
-    task2.task.rts.esp = (DWORD)&task2 + PAGE_SIZE;
-    set_ldt_desc(&task2.task);
-    // link tasks
-    init_task.task.next = &(task2.task);
-    task2.task.next = &(init_task.task);
 
     // set clock interrupt
     // NR_INT_CLOCK
@@ -69,16 +58,6 @@ void init ()
         for (i = 0; i < 100000; ++i)
             ;
         printf("^");
-    }
-}
-
-void init2()
-{
-    while (1) {
-        int i;
-        for (i = 0; i < 100000; ++i)
-            ;
-        printf("&");
     }
 }
 

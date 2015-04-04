@@ -70,9 +70,8 @@ extern struct task_struct *current_task;
 extern void exception_handler(DWORD exp_nr, DWORD err_code, DWORD eip, DWORD cs, DWORD eflags);
 
 void sched_init();
-// void clock_init();
-void init();
-void init2();
 // void trap_init();
+
+void init();
 
 #endif

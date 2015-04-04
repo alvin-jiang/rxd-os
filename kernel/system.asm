@@ -7,21 +7,19 @@
 
 extern _tss
 
-; exception & interrupt
+
 extern exception_handler
 extern intcb_table, int_reenter, current_task
 
 global enable_int, disable_int
-
 global back_to_user_mode
-
+; interrupt
 global _hint32_clock
-
-
+; exception
 global divide_error, debug, nmi, breakpoint, overflow, bounds, invalid_op
 global device_not_available, double_fault, coprocessor_segment_overrun
 global invalid_TSS, segment_not_present, stack_segment, general_protection
-global page_fault, reserved, coprocessor_error
+global _hint14_page_fault, reserved, coprocessor_error
 
 KERNEL_STACK_TOP    equ 0x90000
 GDT_IDX_FIRST_LDT   equ 5
@@ -92,77 +90,70 @@ enter_kernel_mode:
     jmp     [esi + RTS_IDX_RETADDR]
 .already_in_kernel_mode:
     push    back_to_user_mode_reenter
-    mov byte [gs:100], 'R' ; DEBUG
+    mov byte [gs:100], 'R'  ; DEBUG
+    inc byte [gs:102]       ; DEBUG
     jmp     [esi + RTS_IDX_RETADDR]
 
 
-%macro  hwint_master    1
-    mov al, 0x20
+%macro  HINT_MASTER 1
+    call    enter_kernel_mode
+    mov ax, 24              ; DEBUG
+    mov gs, ax
+    mov byte [gs:80], 'K'
+    mov byte [gs:84], 'u'
+    inc byte [gs:82]
+    in  al, 0x21            ; disable current interrupt
+    or  al, (1 << %1)
+    out 0x21, al
+    mov al, 0x20            ; send EOI
     out 0x20, al
-    iretd
+
+    sti
+    push %1
+    call    [intcb_table + 4 * %1]
+    pop ecx             ; TODO: store interrupt number in ECX ??? why?
+    cli
+
+    in  al, 0x21            ; enable current interrupt
+    and al, ~(1 << %1)
+    out 0x21, al
+    ; return to back_to_user_mode or back_to_user_mode_reenter,
+    ; depending on "int_reenter"
+    ret
 %endmacro
 
 ; Interrupt routines
 ALIGN   16
 _hint32_clock:        ; irq 0 (the clock)
-    call    enter_kernel_mode
-
-    ; DEBUG
-    mov ax, 24
-    mov gs, ax
-    mov byte [gs:80], 'K'
-    mov byte [gs:84], 'u'
-    inc byte [gs:82]
-
-    ; disable current interrupt
-    in  al, 0x21
-    or  al, 1
-    out 0x21, al
-    ; send EOI
-    mov al, 0x20
-    out 0x20, al
-
-    sti
-    push 0
-    call    [intcb_table]
-    pop ecx             ; TODO: store interrupt number in ECX ??? why?
-    cli
-
-    ; enable current interrupt
-    in  al, 0x21
-    and al, ~(1)
-    out 0x21, al
-    ; return to back_to_user_mode or back_to_user_mode_reenter,
-    ; depending on "int_reenter"
-    ret
+    HINT_MASTER 0
 
 ALIGN   16
 hwint01:        ; irq 1 (keyboard)
-    hwint_master    1
+    HINT_MASTER    1
 
 ALIGN   16
 hwint02:        ; irq 2 (cascade!)
-    hwint_master    2
+    HINT_MASTER    2
 
 ALIGN   16
 hwint03:        ; irq 3 (second serial)
-    hwint_master    3
+    HINT_MASTER    3
 
 ALIGN   16
 hwint04:        ; irq 4 (first serial)
-    hwint_master    4
+    HINT_MASTER    4
 
 ALIGN   16
 hwint05:        ; irq 5 (XT winchester)
-    hwint_master    5
+    HINT_MASTER    5
 
 ALIGN   16
 hwint06:        ; irq 6 (floppy)
-    hwint_master    6
+    HINT_MASTER    6
 
 ALIGN   16
 hwint07:        ; irq 7 (printer)
-    hwint_master    7
+    HINT_MASTER    7
 
 ; ---------------------------------
 %macro  hwint_slave 1
@@ -257,9 +248,12 @@ stack_segment:
 general_protection:
     push 13
     jmp _exception
-page_fault:
+
+_hint14_page_fault:
+    
     push 14
     jmp _exception
+
 reserved:
     push 15
     jmp _exception
