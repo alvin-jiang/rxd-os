@@ -62,9 +62,6 @@ _after_page_table:
 ; setup Paging
     call    _func_setup_paging
 
-; open interrupt! out of control!
-    sti
-
 ; jump to main.c
     push 0 ; arg data
     push 0 ; argv

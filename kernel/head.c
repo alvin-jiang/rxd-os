@@ -8,7 +8,7 @@ struct gate_struct *idt = (struct gate_struct *)&_idt;
 struct tss_struct *tss = (struct tss_struct *)&_tss;
 
 int_callback intcb_table[INT_REQ_NR];
-int int_reenter = 0;
+int int_reenter;
 
 void set_int_callback(int int_nr, int_callback hdl) {
     intcb_table[int_nr] = hdl;

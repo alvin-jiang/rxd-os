@@ -22,6 +22,7 @@ global invalid_TSS, segment_not_present, stack_segment, general_protection
 global _hint14_page_fault, reserved, coprocessor_error
 
 KERNEL_STACK_TOP    equ 0x90000
+PAGE_SIZE           equ 4096
 GDT_IDX_FIRST_LDT   equ 5
 RTS_IDX_RETADDR     equ 48
 
@@ -41,7 +42,7 @@ back_to_user_mode:
     add eax, GDT_IDX_FIRST_LDT
     shl eax, 3
     lldt ax
-    
+
     add esp, 8                  ; esp -> rts
 
     ; DEBUG
@@ -51,7 +52,8 @@ back_to_user_mode:
     mov byte [gs:84], 'U'
     inc byte [gs:86]
 
-    ; set tss esp0
+    ; set tss esp0 -> rts
+    ; so CPU know where to store regs during interrupt
     lea eax, [esp + 72]
     mov [_tss + 4], eax
 back_to_user_mode_reenter:
@@ -84,8 +86,10 @@ enter_kernel_mode:
     inc     dword [int_reenter]
     cmp     dword [int_reenter], 0
     jne     .already_in_kernel_mode
-    ; switch to kernel stack
-    mov     esp, KERNEL_STACK_TOP
+    ; set kernel stack pointer
+    mov     eax, [current_task]
+    add     eax, PAGE_SIZE
+    mov     esp, eax
     push    back_to_user_mode
     jmp     [esi + RTS_IDX_RETADDR]
 .already_in_kernel_mode:
@@ -250,7 +254,7 @@ general_protection:
     jmp _exception
 
 _hint14_page_fault:
-    
+
     push 14
     jmp _exception
 

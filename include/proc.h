@@ -47,7 +47,7 @@ struct task_struct {
     &init_task.task, \
     { 0x1b, 0x0f, 0x0f, 0x0f, \
         0, 0, 0, 0, 0, 0, 0, 0, \
-        0, (DWORD)&init, 0x07, 0x3200, (DWORD)&init_task + PAGE_SIZE, 0x0f}, \
+        0, (DWORD)&init, 0x07, 0x3200, (DWORD)&(init_task.ustack) + PAGE_SIZE, 0x0f}, \
     { \
         {0x9f, 0xc0fa00}, \
         {0x9f, 0xc0f200}, \

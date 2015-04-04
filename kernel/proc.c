@@ -4,10 +4,13 @@
 
 union task_union {
     struct task_struct task;
-    char stack[PAGE_SIZE];
+    struct {
+        char kstack[PAGE_SIZE]; // kernel stack
+        char ustack[PAGE_SIZE]; // user stack
+    };
 };
-
 static union task_union init_task = {INIT_TASK};
+
 struct task_struct *current_task = &init_task.task;
 
 void on_clock_interrupt (int int_nr);
@@ -37,6 +40,7 @@ void set_ldt_desc (struct task_struct *p_task)
 
 void sched_init ()
 {
+    int_reenter = 0;
     // set task 0
     set_ldt_desc(&init_task.task);
 
@@ -52,12 +56,12 @@ void sched_init ()
 
 void init ()
 {
-    printf("hello, proc init()!\n");
+    printk("hello, proc init()!\n");
     while (1) {
         int i;
         for (i = 0; i < 100000; ++i)
             ;
-        printf("^");
+        printk("^");
     }
 }
 
