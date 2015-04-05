@@ -56,12 +56,15 @@ void sched_init ()
 
 void init ()
 {
-    printk("hello, proc init()!\n");
+    // printk("hello, proc init()!\n");
+    int *_16MB = (int *)0x1000000;
+    int _i16MB = *_16MB;
+    *_16MB = _i16MB;
     while (1) {
-        int i;
-        for (i = 0; i < 100000; ++i)
-            ;
-        printk("^");
+        // int i;
+        // for (i = 0; i < 100000; ++i)
+        //     ;
+        // printk("^");
     }
 }
 

@@ -14,7 +14,7 @@
 
 #include "string.h"
 
-#define PRINT_BUF (512)
+#define PRINT_BUF (80)
 
 // return pos of string terminator ('\0')
 int itoa (unsigned int value, char * str, int base)

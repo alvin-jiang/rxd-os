@@ -48,13 +48,13 @@ _start:
     jmp _sel_code:_after_page_table
 
 times   0x1000-($-$$)  db  0
-_page0:
+_page_table_0:
 times   0x2000-($-$$)  db  0
-_page1:
+_page_table_1:
 times   0x3000-($-$$)  db  0
-_page2:
+_page_table_2:
 times   0x4000-($-$$)  db  0
-_page3:
+_page_table_3:
 
 times   0x5000-($-$$)  db  0
 _after_page_table:
@@ -125,13 +125,13 @@ _func_setup_paging:
     rep stosd
 
     ; set PDE
-    mov dword [0], _page0 + PG_DEFAULT
-    mov dword [4], _page1 + PG_DEFAULT
-    mov dword [8], _page2 + PG_DEFAULT
-    mov dword [12], _page3 + PG_DEFAULT
+    mov dword [0], _page_table_0 + PG_DEFAULT
+    mov dword [4], _page_table_1 + PG_DEFAULT
+    mov dword [8], _page_table_2 + PG_DEFAULT
+    mov dword [12], _page_table_3 + PG_DEFAULT
 
     ; set PTE
-    mov edi, _page3 + 4092
+    mov edi, _page_table_3 + 4092
     mov eax, 0xfff000 + PG_DEFAULT
     std
 .next_pde:

@@ -27,7 +27,6 @@ SETUP_SEGMENT       equ 0x9020
 KERNEL_SEGMENT      equ 0x1000
 
     ; move self from 0x7c00 -> 0x90000
-    cld
     mov ax, 0x07c0
     mov ds, ax
     mov ax, INIT_SEGMENT
@@ -35,6 +34,7 @@ KERNEL_SEGMENT      equ 0x1000
     xor si, si
     xor di, di
     mov cx, 256
+    cld
     rep movsw       ; ds:si -> es:di
     jmp word INIT_SEGMENT:INIT_START;
 

@@ -11,6 +11,8 @@ extern _tss
 extern exception_handler
 extern intcb_table, int_reenter, current_task
 
+extern on_page_fault
+
 global enable_int, disable_int
 global back_to_user_mode
 ; interrupt
@@ -128,7 +130,7 @@ enter_kernel_mode:
 
 ; Interrupt routines
 ALIGN   16
-_hint32_clock:        ; irq 0 (the clock)
+_hint32_clock:      ; irq 0 (the clock)
     HINT_MASTER 0
 
 ALIGN   16
@@ -254,9 +256,43 @@ general_protection:
     jmp _exception
 
 _hint14_page_fault:
+    pushad
+    push ds
+    push es
+    push fs
+    push gs
 
-    push 14
-    jmp _exception
+    mov dx, ss
+    mov ds, dx
+    mov es, dx
+    mov fs, dx
+
+    mov eax, [esp + 48] ; error code
+
+    ; set kernel stack pointer
+    inc     dword [int_reenter]
+    cmp     dword [int_reenter], 0
+    jne     .already_in_kernel_mode
+    mov     edx, [current_task]
+    add     edx, PAGE_SIZE
+    mov     esp, edx
+.already_in_kernel_mode:
+    dec     dword [int_reenter]
+
+    mov edx, cr2        ; error address
+    push edx
+    push eax
+    call    on_page_fault
+
+    mov esp, [current_task]
+    add esp, 8
+    pop gs
+    pop fs
+    pop es
+    pop ds
+    popad
+    add esp, 4 ; skip error code
+    iretd
 
 reserved:
     push 15

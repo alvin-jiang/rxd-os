@@ -49,8 +49,8 @@ struct task_struct {
         0, 0, 0, 0, 0, 0, 0, 0, \
         0, (DWORD)&init, 0x07, 0x3200, (DWORD)&(init_task.ustack) + PAGE_SIZE, 0x0f}, \
     { \
-        {0x9f, 0xc0fa00}, \
-        {0x9f, 0xc0f200}, \
+        {0x2000, 0xc0fa00}, \
+        {0x2000, 0xc0f200}, \
     }}
 
 // not init ldt base & next task pointer

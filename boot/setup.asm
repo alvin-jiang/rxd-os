@@ -60,7 +60,6 @@ SETUP_START:
     cli
 
 ; move kernel to memory 0x00000
-    cld
     push ds
     push es
     mov ax, INIT_SEGMENT
@@ -74,6 +73,7 @@ SETUP_START:
     mov es, bx
     xor si, si
     xor di, di
+    cld
     rep movsw       ; ds:si -> es:di
     pop es
     pop ds

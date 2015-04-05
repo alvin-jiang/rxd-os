@@ -34,10 +34,12 @@ bootsrc = ./boot/boot.asm ./boot/setup.asm
 bootprog = $(bootsrc:.asm=.bin)
 
 kernelsrc = ./boot/head.asm \
-	$(wildcard ./kernel/*.asm) $(wildcard ./kernel/*.c)
+	$(wildcard ./kernel/*.asm) $(wildcard ./kernel/*.c) \
+	$(wildcard ./mm/*.c)
 kernelobjs = ./boot/head.o \
 	$(patsubst %.asm, %.o, $(wildcard ./kernel/*.asm)) \
-	$(patsubst %.c, %.o, $(wildcard ./kernel/*.c))	
+	$(patsubst %.c, %.o, $(wildcard ./kernel/*.c)) \
+	$(patsubst %.c, %.o, $(wildcard ./mm/*.c)) \
 
 libsrc = $(wildcard ./lib/*.asm) $(wildcard ./lib/*.c)
 libobjs = $(patsubst %.asm, %.o, $(wildcard ./lib/*.asm)) \
