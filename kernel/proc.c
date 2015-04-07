@@ -56,21 +56,15 @@ void sched_init ()
 
 void init ()
 {
-    // printk("hello, proc init()!\n");
     int *_16MB = (int *)0x1000000;
     int _i16MB = *_16MB;
     *_16MB = _i16MB;
-    while (1) {
-        // int i;
-        // for (i = 0; i < 100000; ++i)
-        //     ;
-        // printk("^");
-    }
+    printk("hello, page_fault()!\n");
+    while(1);
 }
 
 void on_clock_interrupt (int int_nr)
 {
-    // while(1);
     printk("_");
     assert( current_task && current_task->next );
     current_task = current_task->next;

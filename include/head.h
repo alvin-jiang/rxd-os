@@ -37,9 +37,9 @@ struct tss_struct
 #define GDT_IDX_FIRST_LDT 5
 #define INIT_IDT_DESC {0x0, 0x00408200}
 
-// IDT, Interrupt, Exception
+// IDT: Interrupt, Exception, Syscall
 #define INT_REQ_NR 16
-#define NR_INT_CLOCK            0x20
+// #define NR_INT_CLOCK            0x20
 
 #define EXCEPTION_DIVIDE        0x0
 #define EXCEPTION_DEBUG         0x1

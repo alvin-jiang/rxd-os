@@ -1,22 +1,25 @@
 ;
-; @file: kernel/sys_call.asm
+; @file: kernel/system.asm
 ; @author: Alvin Jiang
 ; @mail: celsius.j@gmail.com
 ; @created time: 2015-03-28
 ;
 
-extern _tss
 
+; vars for user-mode & kernel-mode switch
+extern _tss, current_task, int_reenter
+global back_to_user_mode
 
-extern exception_handler
-extern intcb_table, int_reenter, current_task
+; interrupt & syscall
+extern intcb_table
+global enable_int, disable_int
+global _hint32_clock
 
+; interrupt callback
 extern on_page_fault
 
-global enable_int, disable_int
-global back_to_user_mode
-; interrupt
-global _hint32_clock
+; exception
+extern exception_handler
 ; exception
 global divide_error, debug, nmi, breakpoint, overflow, bounds, invalid_op
 global device_not_available, double_fault, coprocessor_segment_overrun
@@ -83,23 +86,22 @@ enter_kernel_mode:
     mov es, dx
     mov fs, dx
     ; mov gs, dx
-    mov esi, esp                ; esi -> rts
+    mov ebp, esp                ; ebp -> rts
 
     inc     dword [int_reenter]
     cmp     dword [int_reenter], 0
     jne     .already_in_kernel_mode
     ; set kernel stack pointer
-    mov     eax, [current_task]
-    add     eax, PAGE_SIZE
-    mov     esp, eax
+    mov     ecx, [current_task]
+    add     ecx, PAGE_SIZE
+    mov     esp, ecx
     push    back_to_user_mode
-    jmp     [esi + RTS_IDX_RETADDR]
+    jmp     [ebp + RTS_IDX_RETADDR]
 .already_in_kernel_mode:
     push    back_to_user_mode_reenter
     mov byte [gs:100], 'R'  ; DEBUG
     inc byte [gs:102]       ; DEBUG
-    jmp     [esi + RTS_IDX_RETADDR]
-
+    jmp     [ebp + RTS_IDX_RETADDR]
 
 %macro  HINT_MASTER 1
     call    enter_kernel_mode
@@ -256,43 +258,17 @@ general_protection:
     jmp _exception
 
 _hint14_page_fault:
-    pushad
-    push ds
-    push es
-    push fs
-    push gs
-
-    mov dx, ss
-    mov ds, dx
-    mov es, dx
-    mov fs, dx
-
-    mov eax, [esp + 48] ; error code
-
-    ; set kernel stack pointer
-    inc     dword [int_reenter]
-    cmp     dword [int_reenter], 0
-    jne     .already_in_kernel_mode
-    mov     edx, [current_task]
-    add     edx, PAGE_SIZE
-    mov     esp, edx
-.already_in_kernel_mode:
-    dec     dword [int_reenter]
+    mov eax, [esp]      ; error code
+    add esp, 4
+    call enter_kernel_mode
 
     mov edx, cr2        ; error address
     push edx
     push eax
     call    on_page_fault
-
-    mov esp, [current_task]
     add esp, 8
-    pop gs
-    pop fs
-    pop es
-    pop ds
-    popad
-    add esp, 4 ; skip error code
-    iretd
+
+    ret
 
 reserved:
     push 15

@@ -12,10 +12,8 @@
 void main(void)
 {
     printk("\n\n");
-    printk("hello RXD-OS! I'm printk !!!\n");
-    // int *_16MB = (int *)0x1000000;
-    // *_16MB = 1;
-    
+    printk("hello, RXD-OS!\n");
+
     sched_init();
     back_to_user_mode();
     
