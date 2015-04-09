@@ -5,26 +5,26 @@
 ; @created time: 2015-03-28
 ;
 
+extern printk
 
 ; vars for user-mode & kernel-mode switch
 extern _tss, current_task, int_reenter
 global back_to_user_mode
 
 ; interrupt & syscall
-extern intcb_table
+extern syscall_table, intcb_table
 global enable_int, disable_int
-global _hint32_clock
+; handlers
+global _hint144_sys_call, _hint32_clock, _hint14_page_fault
+; callbacks
+extern do_no_page, do_wp_page
 
-; interrupt callback
-extern on_page_fault
-
-; exception
+; ignored
 extern exception_handler
-; exception
 global divide_error, debug, nmi, breakpoint, overflow, bounds, invalid_op
 global device_not_available, double_fault, coprocessor_segment_overrun
 global invalid_TSS, segment_not_present, stack_segment, general_protection
-global _hint14_page_fault, reserved, coprocessor_error
+global reserved, coprocessor_error
 
 KERNEL_STACK_TOP    equ 0x90000
 PAGE_SIZE           equ 4096
@@ -59,7 +59,7 @@ back_to_user_mode:
 
     ; set tss esp0 -> rts
     ; so CPU know where to store regs during interrupt
-    lea eax, [esp + 72]
+    lea eax, [esp + 76]
     mov [_tss + 4], eax
 back_to_user_mode_reenter:
     dec dword [int_reenter]
@@ -68,8 +68,8 @@ back_to_user_mode_reenter:
     pop es
     pop ds
     popad
-    ; skip retaddr
-    add esp, 4
+    ; skip retaddr & error code
+    add esp, 8
     ; ring0 -> ring3, trigger stack switch
     iretd
 
@@ -81,20 +81,19 @@ enter_kernel_mode:
     push fs
     push gs
 
-    mov dx, ss
-    mov ds, dx
-    mov es, dx
-    mov fs, dx
-    ; mov gs, dx
+    mov bp, ss
+    mov ds, bp
+    mov es, bp
+    mov fs, bp
+    ; mov gs, bp
     mov ebp, esp                ; ebp -> rts
 
     inc     dword [int_reenter]
     cmp     dword [int_reenter], 0
     jne     .already_in_kernel_mode
     ; set kernel stack pointer
-    mov     ecx, [current_task]
-    add     ecx, PAGE_SIZE
-    mov     esp, ecx
+    mov     esp, [current_task]
+    add     esp, PAGE_SIZE
     push    back_to_user_mode
     jmp     [ebp + RTS_IDX_RETADDR]
 .already_in_kernel_mode:
@@ -103,7 +102,21 @@ enter_kernel_mode:
     inc byte [gs:102]       ; DEBUG
     jmp     [ebp + RTS_IDX_RETADDR]
 
+_hint144_sys_call:
+    sub esp, 4
+    call    enter_kernel_mode
+
+    ; push params
+    push edx
+    push ebx
+    push eax
+    call    [syscall_table + ecx * 4]
+    add esp, 12
+
+    ret
+
 %macro  HINT_MASTER 1
+    sub esp, 4
     call    enter_kernel_mode
     mov ax, 24              ; DEBUG
     mov gs, ax
@@ -258,14 +271,19 @@ general_protection:
     jmp _exception
 
 _hint14_page_fault:
-    mov eax, [esp]      ; error code
-    add esp, 4
-    call enter_kernel_mode
+    call    enter_kernel_mode
 
+    mov eax, [ebp + 52] ; error code
     mov edx, cr2        ; error address
     push edx
     push eax
-    call    on_page_fault
+    test eax, 1
+    jnz .1
+    call    do_no_page
+    jmp .2
+.1:
+    call    do_wp_page
+.2:
     add esp, 8
 
     ret

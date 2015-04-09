@@ -27,6 +27,7 @@ struct rts_struct {
     DWORD ecx;
     DWORD eax;
     DWORD retaddr;
+    DWORD ecode;
     DWORD eip;
     DWORD cs;
     DWORD eflags;
@@ -47,31 +48,36 @@ struct task_struct {
     &init_task.task, \
     { 0x1b, 0x0f, 0x0f, 0x0f, \
         0, 0, 0, 0, 0, 0, 0, 0, \
-        0, (DWORD)&init, 0x07, 0x3200, (DWORD)&(init_task.ustack) + PAGE_SIZE, 0x0f}, \
+/* retaddr, ecode */  0, 0, \
+        (DWORD)&init, 0x07, 0x3200, (DWORD)&(init_task.ustack) + PAGE_SIZE, 0x0f}, \
     { \
-        {0x2000, 0xc0fa00}, \
-        {0x2000, 0xc0f200}, \
+        {0x9f, 0xc0fa00}, \
+        {0x9f, 0xc0f200}, \
     }}
 
 // not init ldt base & next task pointer
-#define NEW_TASK(pid, func) { \
-    pid, \
-    (void *)0, \
-    { 0x1b, 0x0f, 0x0f, 0x0f, \
-        0, 0, 0, 0, 0, 0, 0, 0, \
-        0, (DWORD)&func, 0x07, 0x3200, PAGE_SIZE, 0x0f}, \
-    { \
-        {0x1, 0xc0fa00}, \
-        {0x1, 0xc0f200}, \
-    }}
+// #define NEW_TASK(pid, func) { \
+//     pid, \
+//     (void *)0, \
+//     { 0x1b, 0x0f, 0x0f, 0x0f, \
+//         0, 0, 0, 0, 0, 0, 0, 0, \
+//         0, (DWORD)&func, 0x07, 0x3200, PAGE_SIZE, 0x0f}, \
+//     { \
+//         {0x1, 0xc0fa00}, \
+//         {0x1, 0xc0f200}, \
+//     }}
 
 
 extern struct task_struct *current_task;
 extern void exception_handler(DWORD exp_nr, DWORD err_code, DWORD eip, DWORD cs, DWORD eflags);
 
+void set_ldt_desc (struct task_struct *p_task);
+
 void sched_init();
 // void trap_init();
 
 void init();
+
+extern int fork (void);
 
 #endif

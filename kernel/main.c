@@ -7,6 +7,7 @@
  *
  */
 
+#include "mm.h"
 #include "proc.h"
 
 void main(void)
@@ -14,6 +15,7 @@ void main(void)
     printk("\n\n");
     printk("hello, RXD-OS!\n");
 
+    mem_init(0x100000, 0xffffff);
     sched_init();
     back_to_user_mode();
     

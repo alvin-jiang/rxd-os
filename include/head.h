@@ -66,9 +66,14 @@ extern struct tss_struct *tss;
 typedef void (*int_callback) (int int_nr);
 extern int_callback intcb_table[];
 extern int int_reenter;
+/* syscall */
+typedef void * syscall;
+extern syscall syscall_table[];
 
 // head.c
-void set_int_callback(int int_nr, int_callback hdl);
+void set_int_callback (int int_nr, int_callback hdl);
+void set_desc_base (struct desc_struct *p_desc, DWORD base);
+void set_desc_limit (struct desc_struct *p_desc, DWORD limit);
 // system.asm
 void enable_int(int int_nr);
 void disable_int(int int_nr);

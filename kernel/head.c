@@ -13,3 +13,17 @@ int int_reenter;
 void set_int_callback(int int_nr, int_callback hdl) {
     intcb_table[int_nr] = hdl;
 }
+
+void set_desc_base (struct desc_struct *p_desc, DWORD base)
+{
+    p_desc->low &= 0x00ff;
+    p_desc->low |= base << 16;
+    p_desc->high &= 0x00ffff00;
+    p_desc->high |= (base >> 16 & 0xff) | (base & 0xff000000);
+}
+void set_desc_limit (struct desc_struct *p_desc, DWORD limit)
+{
+    limit &= 0xfffff;
+    p_desc->low = (p_desc->low & 0xffff0000) | (limit & 0x0000ffff);
+    p_desc->high = (p_desc->high & 0xfff0ffff) | (limit & 0xf0000);
+}
