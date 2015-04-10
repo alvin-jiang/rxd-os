@@ -22,9 +22,7 @@
 ;   boot device into RAM, starting from physical address 0x00007c00
 ; 2. jump to 0x00007c00 and execute
 
-INIT_SEGMENT        equ 0x9000
-SETUP_SEGMENT       equ 0x9020
-KERNEL_SEGMENT      equ 0x1000
+%include "const.inc"
 
     ; move self from 0x7c00 -> 0x90000
     mov ax, 0x07c0
@@ -52,7 +50,7 @@ INIT_START:
     call    _func_disp_msg
 
     ; 0. get root device params
-    call    GetRootDevParams
+    call    _func_get_boot_dev_params
 
     ; 1. load setup.bin into memory
     ; show "loading setup..."
@@ -64,25 +62,25 @@ INIT_START:
     mov bx, 0
     mov ax, 1
     mov cl, [bSetupBinSize]
-    call    ReadRootDevSector
+    call    _func_read_boot_dev
 
     ; 2. load kernel.bin into memory
     ; show "loading kernel..."
     mov bp, Msg_Kernel
     call    _func_disp_msg
-    mov ax, KERNEL_SEGMENT
+    mov ax, KERNEL_SEGMENT0
     mov es, ax
     mov bx, 0
     mov al, [bSetupBinSize]
     mov ah, 0
     inc ax
     mov cl, [bKernelBinSize]
-    call    ReadRootDevSector
+    call    _func_read_boot_dev
     pop es
 
     ; 3.
     ; if boot with floppy disk:
-    call    KillMotor
+    call    _func_kill_motor
     ; if boot with hard disk:
     ;   ...
     ; if boot with U-disk:
@@ -99,12 +97,12 @@ INIT_START:
 ;-------------------------------------
 ; used in _func_disp_msg()
 bPrintToLine        db  0 ; print to which line?
-_func_disp_msgLen          equ 17
+MSG_LEN             equ 17
 Msg_Boot:           db  "booting...       "
 Msg_Setup:          db  "loading setup... "
 Msg_Kernel:         db  "loading kernel..."
 
-; used in ReadRootDevSector()
+; used in _func_read_boot_dev()
 bSecReadCnt         db 0
 ; root device params
 ROOT_DEV            equ 0x00    ; first floppy disk (0x80 for first hard disk)
@@ -137,7 +135,7 @@ _func_disp_msg:
                                 ; AL - 01h, update cursor
     mov bx, 0007h               ; BH - page number
                                 ; BL - 07h, black background, white character
-    mov cx, _func_disp_msgLen          ; CX - number of chars to write
+    mov cx, MSG_LEN          ; CX - number of chars to write
     mov dh, byte [bPrintToLine] ; DH - row to write
     mov dl, 00h                 ; DL - column to write
     inc byte [bPrintToLine]
@@ -145,17 +143,17 @@ _func_disp_msg:
     int 10h                     ; BIOS video service
     ret
 
-GetRootDevParams: ; support floppy & hard disk
+_func_get_boot_dev_params: ; support floppy & hard disk
     mov ah, 08h                 ; AH - 08h, Get Drive Parameters
     mov dl, ROOT_DEV            ; DL - driver number (bit 7 set for hard disk)
     int 13h                     ; BIOS low level disk services
-    jc GetRootDevParams
+    jc _func_get_boot_dev_params
     mov [bSecPerTrk], cl
     inc dh
     mov [bHeads], dh
     ret
 
-ReadRootDevSector:
+_func_read_boot_dev:
 ; in:
 ;   ax - Start Sector(LBA)
 ;   cl - Count to Read
@@ -212,7 +210,7 @@ ReadRootDevSector:
     ;mov ah, 00h
     ;int 13h
 
-KillMotor: ; kill floppy disk motor
+_func_kill_motor: ; kill floppy disk motor
     push dx
     mov dx, 03F2h
     mov al, 0

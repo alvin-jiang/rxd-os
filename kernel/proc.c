@@ -42,11 +42,6 @@ void sched_init ()
 
 void init ()
 {
-    // __asm__ ("int $0x90"::);
-    // int *_16MB = (int *)0x1000000;
-    // int _i16MB = *_16MB;
-    // *_16MB = _i16MB;
-    // while(1);
     int i;
     int pid = fork();
     // printf("hello, fork pid = %x\n", pid);

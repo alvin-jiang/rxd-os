@@ -15,7 +15,8 @@ extern main, printk
 extern _hint32_clock, _hint14_page_fault, _hint144_sys_call
 global _start, _gdt, _idt, _tss
 
-%include    "pm.inc"
+%include "const.inc"
+%include "pm.inc"
 
 [SECTION .text]
 ALIGN 4
@@ -36,7 +37,7 @@ _start:
     mov es, ax
     mov fs, ax
     mov ss, ax
-    mov esp, 0x90000 ; we store boot params on memory >= 0x90000
+    mov esp, KERNEL_STACK_TOP
 
 ; make sure A20 is opened
     call    _func_check_a20

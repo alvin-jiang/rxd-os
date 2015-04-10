@@ -9,7 +9,7 @@
 #ifndef __STDIO_H__
 #define __STDIO_H__
 
-#define EOF (-1)
+// #define EOF (-1)
 
 // klib.asm
 void printk (const char *s);

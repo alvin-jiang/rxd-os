@@ -13,9 +13,7 @@
 ; 6. set temporary GDT, A20, enable Protected-Mode
 ; 7. jump to head part of kernel.bin
 
-INIT_SEGMENT        equ 0x9000
-SETUP_SEGMENT       equ 0x9020
-KERNEL_SEGMENT      equ 0x1000
+%include "const.inc"
 %include "pm.inc"
 
 SETUP_START:
@@ -67,7 +65,7 @@ SETUP_START:
     mov cl, [ds:509]
     movzx cx, cl
     shl cx, 8       ; cx = kernel size in words
-    mov bx, KERNEL_SEGMENT
+    mov bx, KERNEL_SEGMENT0
     mov ds, bx
     mov bx, 0x0000
     mov es, bx
