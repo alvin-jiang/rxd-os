@@ -22,6 +22,7 @@ ASMOBJ	= -I boot/ -f elf32
 
 CC		= gcc
 CFLAGS	= -I include/ -m32 -c -fno-builtin -fno-stack-protector -Werror
+#-Wall
 LD		= ld
 LDFLAGS		= -m elf_i386 --oformat=binary -Map krnl.map -Ttext $(ENTRYPOINT)
 #LDFLAGS	= -m elf_i386 -Map krnl.map -Ttext $(ENTRYPOINT)

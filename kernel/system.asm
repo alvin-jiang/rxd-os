@@ -15,7 +15,7 @@ global back_to_user_mode
 extern syscall_table, intcb_table
 global enable_int, disable_int
 ; handlers
-global _hint144_sys_call, _hint32_clock, _hint14_page_fault
+global _hint144_sys_call, _hint32_clock, _hint14_page_fault, _hint33_keyboard
 ; callbacks
 extern do_no_page, do_wp_page
 
@@ -25,6 +25,9 @@ global divide_error, debug, nmi, breakpoint, overflow, bounds, invalid_op
 global device_not_available, double_fault, coprocessor_segment_overrun
 global invalid_TSS, segment_not_present, stack_segment, general_protection
 global reserved, coprocessor_error
+
+; I/O
+global in_byte, out_byte, port_read, port_write
 
 KERNEL_STACK_TOP    equ 0x90000
 PAGE_SIZE           equ 4096
@@ -149,8 +152,8 @@ _hint32_clock:      ; irq 0 (the clock)
     HINT_MASTER 0
 
 ALIGN   16
-hwint01:        ; irq 1 (keyboard)
-    HINT_MASTER    1
+_hint33_keyboard:   ; irq 1 (keyboard)
+    HINT_MASTER 1
 
 ALIGN   16
 hwint02:        ; irq 2 (cascade!)
@@ -354,5 +357,41 @@ enable_8:
     popf
     ret
 
+; void out_byte(u16 port, u8 value);
+out_byte:
+    mov edx, [esp + 4]      ; port
+    mov al, [esp + 4 + 4]   ; value
+    out dx, al
+    nop
+    nop
+    ret
 
+; u8 in_byte(u16 port);
+in_byte:
+    mov edx, [esp + 4]      ; port
+    xor eax, eax
+    in  al, dx
+    nop
+    nop
+    ret
+
+; void port_read(u16 port, void* buf, int n);
+port_read:
+    mov edx, [esp + 4]      ; port
+    mov edi, [esp + 4 + 4]  ; buf
+    mov ecx, [esp + 4 + 4 + 4]  ; n
+    shr ecx, 1
+    cld
+    rep insw
+    ret
+
+; void port_write(u16 port, void* buf, int n);
+port_write:
+    mov edx, [esp + 4]      ; port
+    mov esi, [esp + 4 + 4]  ; buf
+    mov ecx, [esp + 4 + 4 + 4]  ; n
+    shr ecx, 1
+    cld
+    rep outsw
+    ret
 

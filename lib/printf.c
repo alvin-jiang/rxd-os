@@ -54,6 +54,13 @@ int vsprintf (char * str, const char * format, va_list args)
         case '%':
             state = 1;
             break;
+        case 'c':
+            if (state == 1) {
+                *(s++) = va_arg(args, const char);
+                state = 0;
+            } else
+                ++s;
+            break;
         case 's':
             if (state == 1) {
                 ap = va_arg(args, const char *);

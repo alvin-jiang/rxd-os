@@ -70,6 +70,6 @@ void on_clock_interrupt (int int_nr)
     assert( current_task && current_task->next );
     current_task = current_task->next;
     // printk(".");
-    printf("\r%x", current_task->pid);
+    // printf("\r%x", current_task->pid);
 }
 

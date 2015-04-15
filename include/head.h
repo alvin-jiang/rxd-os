@@ -75,8 +75,10 @@ void set_int_callback (int int_nr, int_callback hdl);
 void set_desc_base (struct desc_struct *p_desc, DWORD base);
 void set_desc_limit (struct desc_struct *p_desc, DWORD limit);
 // system.asm
-void enable_int(int int_nr);
-void disable_int(int int_nr);
+void enable_int (int int_nr);
+void disable_int (int int_nr);
+BYTE in_byte (WORD port);
+void out_byte (WORD port, BYTE value);
 #define sti() __asm__ ("sti"::)
 #define cli() __asm__ ("cli"::)
 

@@ -27,6 +27,7 @@ printk:
 
     mov esi, [ebp + 8]
     mov dx, word [0x90000]  ; dx = cursor pos
+
     mov al, 80
     mul dh
     add al, dl

@@ -11,4 +11,9 @@
         while(1); } \
     } while(0)
 
+#define panic(msg) do { \
+    printf("!!! PANIC -> " msg "\n"); \
+    assert(0); \
+    } while(0)
+
 #endif
