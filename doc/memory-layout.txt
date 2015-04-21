@@ -1,0 +1,79 @@
+
+Memory Layout in RXD-OS Perspective:
+
+    ------------------------  0xFFFFFFFF (4 GB)
+    ...
+    ------------------------    0x10FFFF (1 MB + 64 K)
++   ...
++   Page Tables
++   Page Directory Table
++   ---------A20 on---------    0x100000 (1 MB)
+    ...
+    Text Video Buffer           0x B8000 - 0x BFFFF (32 K)
+    ...
+    Graphic Video Buffer        0x A0000 - 0x AFFFF (64 K)
+    ...
+    ------------------------    0x 9fc00 (639 K)
++K  ...
++K  setup.bin                   0x 90000 (576 K)
++K  ...
++K  kernel.bin                  0x 10000 (32 K)
++K  ...
++K  ------------------------    0x  7E00 (31.5 K)
++K  boot.bin (auto-load by BIOS, size = 1 sector = 0.5 K)
++K  ------------------------    0x  7C00 (31 K)
++K  ...
++K  ------------------------    0x  0500 (1.25 K)
+    ...
+    ------------------------    0x  0000 (0 K)
+
+Note:
+'+' indicates free memory available for RXD-OS
+'K' indicates memory used by RXD-OS kernel
+
+
+    ------------------------  0xFFFFFFFF (4 GB)
+    ...
+    ------------------------    0x10FFFF (1 MB + 64 K)
+    ...
+    ---------A20 on---------    0x100000 (1 MB)
+    ...
+    Text Video Buffer           0x B8000 - 0x BFFFF (32 K)
+    ...
+    Graphic Video Buffer        0x A0000 - 0x AFFFF (64 K)
+    ...
+    ------------------------    0x 9fc00 (639 K)
+    ...
+    ...                       
+    boot params                 0x 90000 - 0x 90200 (0.5 K)
+    ...
+    system.o
+    main.o
+    head.o
+    PTE3                        0x 04000 - 0x 05000
+    PTE2                        0x 03000 - 0x 04000
+    PTE1                        0x 02000 - 0x 03000
+    PTE0                        0x 01000 - 0x 02000
+    PDE0                        0x 00000 - 0x 01000
+    ------------------------    0x  0000 (0 K)
+
+
+Memory Layout in BIOS Perspective:
+
+    ...
+    ------------------------    0x10FFFF (1 MB + 64 K)
+    Free
+    ---------A20 on---------    0x100000 (1 MB)
+*   Used by BIOS
+*   ------------------------    0x 9fc00 (639 K)
+*   Free
+*   ------------------------    0x  7E00 (31.5 K)
+*   Loaded Boot Sector
+*   ------------------------    0x  7C00 (31 K)
+*   Free
+*   ------------------------    0x  0500 (1.25 K)
+*   Used by BIOS
+*   ------------------------    0x  0000 (0 K)
+
+Note:
+'*' indicates accessible memory in 386 Real-Mode

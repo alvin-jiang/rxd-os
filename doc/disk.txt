@@ -1,0 +1,9 @@
+1. LBA 与 CHS 地址转换: 
+    NS: 每磁道扇区数
+    NH: 磁头数
+    C、H、S: 柱面, 磁头, 扇区号
+
+    LBA = NH * NS * C + NS * H + S - 1
+    C   = (LBA div NS) div NH
+    H   = (LBA div NS) mod NH
+    S   = (LBA mod NS) + 1

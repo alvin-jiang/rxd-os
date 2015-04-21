@@ -1,0 +1,3 @@
+boot.asm    sector 0
+setup.asm   sector 1~4
+kernel      sector 5~N

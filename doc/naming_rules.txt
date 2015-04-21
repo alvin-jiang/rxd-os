@@ -1,0 +1,6 @@
+ASM:
+    _internal_label
+    _func_internal_a
+    CONST_VALUE
+
+    external_label
