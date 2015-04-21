@@ -14,7 +14,9 @@ KERNEL_STACK_TOP    equ 0x90000
 ; boot params
 ;-------------------------------------
 
-BOOT_PARAM_CURSOR   equ 0x90000
-BOOT_PARAM_MEM_SIZE equ 0x90002
+BOOT_PARAM_CURSOR           equ 0x90000
+BOOT_PARAM_MEM_SIZE         equ 0x90002
+BOOT_PARAM_HD_SECT_PER_TRK  equ 0x90006
+BOOT_PARAM_HD_HEAD_NR       equ 0x90007
 
 

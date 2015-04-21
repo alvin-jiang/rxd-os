@@ -22,7 +22,7 @@ ASMOBJ	= -I boot/ -f elf32
 
 CC		= gcc
 CFLAGS	= -I include/ -m32 -c -fno-builtin -fno-stack-protector -Werror
-#-Wall
+#-Wpadded -Wall
 LD		= ld
 LDFLAGS		= -m elf_i386 --oformat=binary -Map krnl.map -Ttext $(ENTRYPOINT)
 #LDFLAGS	= -m elf_i386 -Map krnl.map -Ttext $(ENTRYPOINT)
@@ -35,11 +35,14 @@ bootsrc = ./boot/boot.asm ./boot/setup.asm
 bootprog = $(bootsrc:.asm=.bin)
 
 kernelsrc = ./boot/head.asm \
-	$(wildcard ./kernel/*.asm) $(wildcard ./kernel/*.c) \
+	$(wildcard ./kernel/*.asm) \
+	$(wildcard ./kernel/*.c) \
+	$(wildcard ./kernel/blk_drv/*.c) \
 	$(wildcard ./mm/*.c)
 kernelobjs = ./boot/head.o \
 	$(patsubst %.asm, %.o, $(wildcard ./kernel/*.asm)) \
 	$(patsubst %.c, %.o, $(wildcard ./kernel/*.c)) \
+	$(patsubst %.c, %.o, $(wildcard ./kernel/blk_drv/*.c)) \
 	$(patsubst %.c, %.o, $(wildcard ./mm/*.c)) \
 
 libsrc = $(wildcard ./lib/*.asm) $(wildcard ./lib/*.c)

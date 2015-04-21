@@ -1,5 +1,6 @@
 #include "proc.h"
 
+#include "hd.h"
 #include "assert.h"
 
 union task_union {
@@ -18,8 +19,8 @@ void on_clock_interrupt (int int_nr);
 void set_ldt_desc (struct task_struct *p_task)
 {
     struct desc_struct ldt_desc = INIT_IDT_DESC;
-    set_desc_base(&ldt_desc, (DWORD)&p_task->ldt);
-    set_desc_limit(&ldt_desc, (DWORD)(sizeof(struct desc_struct) * 2));
+    set_desc_base(&ldt_desc, (uint32)&p_task->ldt);
+    set_desc_limit(&ldt_desc, (uint32)(sizeof(struct desc_struct) * 2));
 
     memcpy(&gdt[GDT_IDX_FIRST_LDT + p_task->pid], &ldt_desc, sizeof(struct desc_struct));
 }
@@ -53,6 +54,7 @@ void init ()
         for (i = 0; i < 100000; ++i)
             ;
         printf("hello, I'm parent proc [%x]\n", pid);
+        // hd_read(0, 0, 0);
     }
     while (1) {
         // int i;
@@ -62,14 +64,39 @@ void init ()
     }
 }
 
+void schedule (void)
+{
+    assert( current_task && current_task->next );
+    do {
+        current_task = current_task->next;
+    } while (current_task->state != TASK_RUNNING);
+}
+
 void on_clock_interrupt (int int_nr)
 {
     if (int_reenter != 0)
         return;
 
-    assert( current_task && current_task->next );
-    current_task = current_task->next;
-    // printk(".");
-    // printf("\r%x", current_task->pid);
+    schedule();
+}
+
+void sleep_on(struct task_struct ** p)
+{
+    struct task_struct *tmp;
+
+    if (!p)
+        return;
+    if (current_task == &(init_task.task))
+        panic("task[0] trying to sleep");
+    tmp = *p;
+    *p = current_task;
+    current_task->state = TASK_UNINTERRUPTIBLE;
+    schedule();
+    if (tmp)
+        tmp->state=0;
+}
+void wake_up(struct task_struct ** p)
+{
+
 }
 

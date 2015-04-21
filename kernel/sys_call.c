@@ -23,13 +23,13 @@ void do_fork ()
     p_task->pid = 1;
 
     // set ldt
-    set_desc_base(&(p_task->ldt[0]), (DWORD)(p_task->pid * _64MB));
-    set_desc_base(&(p_task->ldt[1]), (DWORD)(p_task->pid * _64MB));
+    set_desc_base(&(p_task->ldt[0]), (uint32)(p_task->pid * _64MB));
+    set_desc_base(&(p_task->ldt[1]), (uint32)(p_task->pid * _64MB));
     set_ldt_desc(p_task);
     // share VMA, set write-protect
     // share_vma(old_base, new_base, old_limit);
-    share_vma((DWORD)(current_task->pid * _64MB),
-        (DWORD)(p_task->pid * _64MB), 640 * 1024/* limit */);
+    share_vma((uint32)(current_task->pid * _64MB),
+        (uint32)(p_task->pid * _64MB), 640 * 1024/* limit */);
 
     // set return values
     p_task->rts.eax = p_task->pid;

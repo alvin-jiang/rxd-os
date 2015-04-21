@@ -15,7 +15,8 @@ global back_to_user_mode
 extern syscall_table, intcb_table
 global enable_int, disable_int
 ; handlers
-global _hint144_sys_call, _hint32_clock, _hint14_page_fault, _hint33_keyboard
+global _hint144_sys_call, _hint14_page_fault
+global _hint32_clock, _hint33_keyboard, _hint34_cascade, _hint46_AT
 ; callbacks
 extern do_no_page, do_wp_page
 
@@ -27,7 +28,7 @@ global invalid_TSS, segment_not_present, stack_segment, general_protection
 global reserved, coprocessor_error
 
 ; I/O
-global in_byte, out_byte, port_read, port_write
+global in_byte, out_byte, port_read, port_write, port_write2
 
 KERNEL_STACK_TOP    equ 0x90000
 PAGE_SIZE           equ 4096
@@ -132,11 +133,11 @@ _hint144_sys_call:
     mov al, 0x20            ; send EOI
     out 0x20, al
 
-    sti
+    ;sti
     push %1
     call    [intcb_table + 4 * %1]
     pop ecx             ; TODO: store interrupt number in ECX ??? why?
-    cli
+    ;cli
 
     in  al, 0x21            ; enable current interrupt
     and al, ~(1 << %1)
@@ -146,79 +147,89 @@ _hint144_sys_call:
     ret
 %endmacro
 
-; Interrupt routines
-ALIGN   16
-_hint32_clock:      ; irq 0 (the clock)
-    HINT_MASTER 0
+%macro  HINT_SLAVE 1
+    sub esp, 4
+    call    enter_kernel_mode
+    mov ax, 24              ; DEBUG
+    mov gs, ax
+    mov byte [gs:80], 'S'
+    mov byte [gs:84], 'u'
+    inc byte [gs:82]
+    in  al, 0xa1            ; disable current interrupt
+    or  al, (1 << (%1 - 8))
+    out 0xa1, al
+    mov al, 0x20            ; send EOI
+    out 0x20, al
+    nop
+    out 0xa0, al
 
-ALIGN   16
-_hint33_keyboard:   ; irq 1 (keyboard)
-    HINT_MASTER 1
+    ;sti
+    push %1
+    call    [intcb_table + 4 * %1]
+    pop ecx             ; TODO: store interrupt number in ECX ??? why?
+    ;cli
 
-ALIGN   16
-hwint02:        ; irq 2 (cascade!)
-    HINT_MASTER    2
-
-ALIGN   16
-hwint03:        ; irq 3 (second serial)
-    HINT_MASTER    3
-
-ALIGN   16
-hwint04:        ; irq 4 (first serial)
-    HINT_MASTER    4
-
-ALIGN   16
-hwint05:        ; irq 5 (XT winchester)
-    HINT_MASTER    5
-
-ALIGN   16
-hwint06:        ; irq 6 (floppy)
-    HINT_MASTER    6
-
-ALIGN   16
-hwint07:        ; irq 7 (printer)
-    HINT_MASTER    7
-
-; ---------------------------------
-%macro  hwint_slave 1
-    push    %1
-    ;call    spurious_int
-    add esp, 4
-    hlt
+    in  al, 0xa1            ; enable current interrupt
+    and al, ~(1 << (%1 - 8))
+    out 0xa1, al
+    ; return to back_to_user_mode or back_to_user_mode_reenter,
+    ; depending on "int_reenter"
+    ret
 %endmacro
-; ---------------------------------
+
+; Interrupt request routines 32~47
+ALIGN   16
+_hint32_clock:
+HINT_MASTER 0   ; irq 0 (the clock)
 
 ALIGN   16
-hwint08:        ; irq 8 (realtime clock).
-    hwint_slave 8
+_hint33_keyboard:
+HINT_MASTER 1   ; irq 1 (keyboard)
 
 ALIGN   16
-hwint09:        ; irq 9 (irq 2 redirected)
-    hwint_slave 9
+_hint34_cascade:
+HINT_MASTER 2   ; irq 2 (cascade!)
 
 ALIGN   16
-hwint10:        ; irq 10
-    hwint_slave 10
+HINT_MASTER 3   ; irq 3 (second serial)
 
 ALIGN   16
-hwint11:        ; irq 11
-    hwint_slave 11
+HINT_MASTER 4   ; irq 4 (first serial)
 
 ALIGN   16
-hwint12:        ; irq 12
-    hwint_slave 12
+HINT_MASTER 5   ; irq 5 (XT winchester)
 
 ALIGN   16
-hwint13:        ; irq 13 (FPU exception)
-    hwint_slave 13
+HINT_MASTER 6   ; irq 6 (floppy)
 
 ALIGN   16
-hwint14:        ; irq 14 (AT winchester)
-    hwint_slave 14
+HINT_MASTER 7   ; irq 7 (printer)
 
 ALIGN   16
-hwint15:        ; irq 15
-    hwint_slave 15
+HINT_SLAVE  8   ; irq 8 (realtime clock).
+
+ALIGN   16
+HINT_SLAVE  9   ; irq 9 (irq 2 redirected)
+
+ALIGN   16
+HINT_SLAVE  10  ; irq 10
+
+ALIGN   16
+HINT_SLAVE  11  ; irq 11
+
+ALIGN   16
+HINT_SLAVE  12  ; irq 12
+
+ALIGN   16
+HINT_SLAVE  13  ; irq 13 (FPU exception)
+
+ALIGN   16
+_hint46_AT:
+HINT_SLAVE  14  ; irq 14 (AT winchester)
+
+ALIGN   16
+HINT_SLAVE  15  ; irq 15
+
 
 ; Exception routines
 divide_error:
@@ -395,3 +406,14 @@ port_write:
     rep outsw
     ret
 
+port_write2:
+    mov edx, [esp + 4]      ; port
+    mov esi, [esp + 4 + 4]  ; buf
+    mov ecx, [esp + 4 + 4 + 4]  ; n
+    shr ecx, 1
+    cld
+.loop:
+    outsw
+    jmp $ + 2
+    loop .loop
+    ret

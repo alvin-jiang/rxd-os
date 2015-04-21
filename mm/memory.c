@@ -14,16 +14,16 @@
 #include "string.h"
 
 #define LOW_MEM 0x100000
-static DWORD HIGH_MEMORY = 0;
+static uint32 HIGH_MEMORY = 0;
 #define TOTAL_MEM (15 * 1024 * 1024)
 
 #define NR_PAGES (TOTAL_MEM >> 12)
 #define mmi(addr) (((addr) - LOW_MEM) >> 12)
 
-#define PDE(vaddr) ((DWORD *)0x0 + ((vaddr) >> 22))
-#define PTE(vaddr) ((DWORD *)(*(PDE(vaddr)) & 0xfffff000) + (((vaddr) >> 12) & 0x3ff))
-#define PAGE_ADDR(vaddr) (DWORD)(*(PTE(vaddr)) & 0xfffff000)
-#define PHYSICAL_ADDR(vaddr) (DWORD)(*(PTE(vaddr)) & 0xfffff000 + (vaddr) & 0xfff)
+#define PDE(vaddr) ((uint32 *)0x0 + ((vaddr) >> 22))
+#define PTE(vaddr) ((uint32 *)(*(PDE(vaddr)) & 0xfffff000) + (((vaddr) >> 12) & 0x3ff))
+#define PAGE_ADDR(vaddr) (uint32)(*(PTE(vaddr)) & 0xfffff000)
+#define PHYSICAL_ADDR(vaddr) (uint32)(*(PTE(vaddr)) & 0xfffff000 + (vaddr) & 0xfff)
 
 #define RESERVED_PAGE (100)
 
@@ -31,7 +31,7 @@ static DWORD HIGH_MEMORY = 0;
 
 static unsigned char mem_map[NR_PAGES];
 
-void mem_init (DWORD mem_start, DWORD mem_end)
+void mem_init (uint32 mem_start, uint32 mem_end)
 {
     assert( mem_start >= LOW_MEM && mem_start < mem_end
         && mem_end < (LOW_MEM + TOTAL_MEM));
@@ -56,7 +56,7 @@ void mem_stat (void)
     printf("[mem stat] %d free pages of %d\n", free_pages, NR_PAGES);
 }
 
-DWORD get_phy_page (void)
+uint32 get_phy_page (void)
 {
     int i;
     for (i = 0; i < NR_PAGES; ++i) {
@@ -76,7 +76,7 @@ DWORD get_phy_page (void)
     return LOW_MEM + (i << 12);
 }
 
-void free_phy_page (DWORD page_addr)
+void free_phy_page (uint32 page_addr)
 {
     assert( mem_map[mmi(page_addr)] > 0 );
 
@@ -84,7 +84,7 @@ void free_phy_page (DWORD page_addr)
 }
 
 // assume size == 4MB
-void share_vma (DWORD from, DWORD to, DWORD size)
+void share_vma (uint32 from, uint32 to, uint32 size)
 {
     assert( ((from & 0x003fffff) == 0) &&
         ((to & 0x003fffff) == 0) );
@@ -92,20 +92,20 @@ void share_vma (DWORD from, DWORD to, DWORD size)
         (from - to >= size) : (to - from >= size) );
 
     printf("share_vma: %x -> %x [%x]\n", from, to, size);
-    DWORD * from_pde = PDE(from);
-    DWORD * to_pde = PDE(to);
+    uint32 * from_pde = PDE(from);
+    uint32 * to_pde = PDE(to);
     printf("from_pde: %x to_pde: %x\n", from_pde, to_pde);
     // alloc page table
     assert( *to_pde == 0 );
-    // DWORD pt_addr = get_phy_page();
+    // uint32 pt_addr = get_phy_page();
     *to_pde = (get_phy_page() & 0xfffff000) | PAGE_DEFAULT;
     printf("          -> to_pde: %x\n", to_pde);
     // while(1);
 
     // copy page table with write-protect enabled
     int i;
-    DWORD * from_page = (DWORD *)(*from_pde & 0xfffff000);
-    DWORD * to_page = (DWORD *)(*to_pde & 0xfffff000);
+    uint32 * from_page = (uint32 *)(*from_pde & 0xfffff000);
+    uint32 * to_page = (uint32 *)(*to_pde & 0xfffff000);
     for (i = 0; i < 1024; ++i) {
         *(to_page++) = (*(from_page++) & 0xfffffffd);
         // *(from_page++) = (*(to_page++) &= 0xfffffffd);
@@ -113,15 +113,15 @@ void share_vma (DWORD from, DWORD to, DWORD size)
         // ++mem_map[mmi(*to_page)];
     }
     // video mem must share!!!
-    *((DWORD *)(*to_pde & 0xfffff000) + 144) |= 2;
+    *((uint32 *)(*to_pde & 0xfffff000) + 144) |= 2;
 }
 
-void do_no_page (DWORD err_code, DWORD addr)
+void do_no_page (uint32 err_code, uint32 addr)
 {
     printf("PF: [No Page] code: %d addr: 0x%x\n", err_code, addr);
     // set PDE
-    DWORD * p_pde = PDE(addr);
-    DWORD pt_addr = 0;
+    uint32 * p_pde = PDE(addr);
+    uint32 pt_addr = 0;
     if ( !(*p_pde & 0x1) ) {
         pt_addr = get_phy_page();
         memset((void *)pt_addr, 0, PAGE_SIZE);
@@ -131,23 +131,23 @@ void do_no_page (DWORD err_code, DWORD addr)
         pt_addr = (*p_pde & 0xfffff000);
     assert( pt_addr != 0 );
     // set PTE
-    DWORD * p_pte = (DWORD *)pt_addr + ((addr >> 12) & 0x3ff);
+    uint32 * p_pte = (uint32 *)pt_addr + ((addr >> 12) & 0x3ff);
     assert( *p_pte == 0 );
-    DWORD pg_addr = get_phy_page();
+    uint32 pg_addr = get_phy_page();
     *p_pte = (pg_addr & 0xfffff000) | PAGE_DEFAULT;
 }
 
-void do_wp_page (DWORD err_code, DWORD addr)
+void do_wp_page (uint32 err_code, uint32 addr)
 {
-    DWORD paddr = PAGE_ADDR(addr);
+    uint32 paddr = PAGE_ADDR(addr);
     printf("PF: [WP Page] code: %d addr: 0x%x paddr: 0x%x\n",
         err_code, addr, paddr);
     
     if (paddr < LOW_MEM) {
         // just remove wp
-        DWORD * p_pte = PTE(addr);
+        uint32 * p_pte = PTE(addr);
 
-        DWORD pg_addr = get_phy_page();
+        uint32 pg_addr = get_phy_page();
         memcpy((void *)pg_addr, (void *)(*p_pte & 0xfffff000), PAGE_SIZE);
         printf("!! kernel page, COW: %x -> %x\n", (*p_pte & 0xfffff000), pg_addr);
         *p_pte = (pg_addr & 0xfffff000) | PAGE_DEFAULT;
@@ -165,9 +165,9 @@ void do_wp_page (DWORD err_code, DWORD addr)
     else {
         assert( mem_map[mmi(paddr)] >= 2);
         if (addr >= LOW_MEM) { // copy on write
-            DWORD * p_pte = PTE(addr);
+            uint32 * p_pte = PTE(addr);
 
-            DWORD pg_addr = get_phy_page();
+            uint32 pg_addr = get_phy_page();
             memcpy((void *)pg_addr, (void *)(*p_pte & 0xfffff000), PAGE_SIZE);
             *p_pte = (pg_addr & 0xfffff000) | PAGE_DEFAULT;
             --mem_map[mmi(addr)];

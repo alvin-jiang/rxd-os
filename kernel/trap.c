@@ -1,7 +1,7 @@
 
 #include "head.h"
 
-// void set_idt_desc(BYTE vector, BYTE type, int_handler handler, BYTE privilege)
+// void set_idt_desc(uint8 vector, uint8 type, int_handler handler, uint8 privilege)
 // {
 //     struct gate * p_gate    = &idt[vector];
 //     u32 base = (u32)handler;
@@ -38,7 +38,7 @@
     // outb(inb_p(0xA1)&0xdf,0xA1);     ; FPU exception
 // }
 
-void exception_handler(DWORD exp_nr, DWORD err_code, DWORD eip, DWORD cs, DWORD eflags)
+void exception_handler(uint32 exp_nr, uint32 err_code, uint32 eip, uint32 cs, uint32 eflags)
 {
     int i;
 
@@ -67,20 +67,20 @@ void exception_handler(DWORD exp_nr, DWORD err_code, DWORD eip, DWORD cs, DWORD 
     printf("Exception: %s\nError Code: 0x%x\n", err_desc[exp_nr], err_code);
 }
 
-// void divide_error(DWORD err_nr, DWORD err_code);
-// void debug(DWORD err_nr, DWORD err_code);
-// void nmi(DWORD err_nr, DWORD err_code);
-// void breakpoint(DWORD err_nr, DWORD err_code);
-// void overflow(DWORD err_nr, DWORD err_code);
-// void bounds(DWORD err_nr, DWORD err_code);
-// void invalid_op(DWORD err_nr, DWORD err_code);
-// void device_not_available(DWORD err_nr, DWORD err_code);
-// void double_fault(DWORD err_nr, DWORD err_code);
-// void coprocessor_segment_overrun(DWORD err_nr, DWORD err_code);
-// void invalid_TSS(DWORD err_nr, DWORD err_code);
-// void segment_not_present(DWORD err_nr, DWORD err_code);
-// void stack_segment(DWORD err_nr, DWORD err_code);
-// void general_protection(DWORD err_nr, DWORD err_code);
-// void page_fault(DWORD err_nr, DWORD err_code);
-// void reserved(DWORD err_nr, DWORD err_code);
-// void coprocessor_error(DWORD err_nr, DWORD err_code);
+// void divide_error(uint32 err_nr, uint32 err_code);
+// void debug(uint32 err_nr, uint32 err_code);
+// void nmi(uint32 err_nr, uint32 err_code);
+// void breakpoint(uint32 err_nr, uint32 err_code);
+// void overflow(uint32 err_nr, uint32 err_code);
+// void bounds(uint32 err_nr, uint32 err_code);
+// void invalid_op(uint32 err_nr, uint32 err_code);
+// void device_not_available(uint32 err_nr, uint32 err_code);
+// void double_fault(uint32 err_nr, uint32 err_code);
+// void coprocessor_segment_overrun(uint32 err_nr, uint32 err_code);
+// void invalid_TSS(uint32 err_nr, uint32 err_code);
+// void segment_not_present(uint32 err_nr, uint32 err_code);
+// void stack_segment(uint32 err_nr, uint32 err_code);
+// void general_protection(uint32 err_nr, uint32 err_code);
+// void page_fault(uint32 err_nr, uint32 err_code);
+// void reserved(uint32 err_nr, uint32 err_code);
+// void coprocessor_error(uint32 err_nr, uint32 err_code);

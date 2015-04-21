@@ -6,30 +6,32 @@
 
 struct desc_struct
 {
-    DWORD low, high;
+    uint32 low, high;
 };
 
 struct gate_struct
 {
-    WORD    offset_low;
-    WORD    selector;
-    BYTE    __reserved;   // we don't use call gate
-    BYTE    attr;
-    WORD    offset_high;
+    uint16    offset_low;
+    uint16    selector;
+    uint8    __reserved;   // we don't use call gate
+    uint8    attr;
+    uint16    offset_high;
 };
 
 struct tss_struct
 {
-    DWORD __reserved0;
-    DWORD esp0;
-    DWORD ss0;
-    WORD __reserved1[45];
-    WORD iobase;
+    uint32 __reserved0;
+    uint32 esp0;
+    uint32 ss0;
+    uint16 __reserved1[45];
+    uint16 iobase;
 };
 
 // boot params
-#define BOOT_PARAM_CURSOR (*(WORD *)0x90000)
-#define BOOT_PARAM_MEM_SIZE (*(DWORD *)0x90002)
+#define BOOT_PARAM_CURSOR           (*(uint16 *)0x90000)
+#define BOOT_PARAM_MEM_SIZE         (*(uint32 *)0x90002)
+#define BOOT_PARAM_HD_SECT_PER_TRK  (*(uint8 *)0x90006)
+#define BOOT_PARAM_HD_HEAD_NR       (*(uint8 *)0x90007)
 
 #define PAGE_SIZE 4096
 
@@ -72,19 +74,22 @@ extern syscall syscall_table[];
 
 // head.c
 void set_int_callback (int int_nr, int_callback hdl);
-void set_desc_base (struct desc_struct *p_desc, DWORD base);
-void set_desc_limit (struct desc_struct *p_desc, DWORD limit);
+void set_desc_base (struct desc_struct *p_desc, uint32 base);
+void set_desc_limit (struct desc_struct *p_desc, uint32 limit);
 // system.asm
 void enable_int (int int_nr);
 void disable_int (int int_nr);
-BYTE in_byte (WORD port);
-void out_byte (WORD port, BYTE value);
+uint8 in_byte (uint16 port);
+void out_byte (uint16 port, uint8 value);
 #define sti() __asm__ ("sti"::)
 #define cli() __asm__ ("cli"::)
+void port_read (uint16 port, void * buf, int n);
+void port_write (uint16 port, void * buf, int n);
+void port_write2 (uint16 port, void * buf, int n);
 
 // TODO: make this asm macro
-// void set_base(struct desc_struct *p_desc, DWORD base);
-// void set_limit(struct desc_struct *p_desc, DWORD limit);
+// void set_base(struct desc_struct *p_desc, uint32 base);
+// void set_limit(struct desc_struct *p_desc, uint32 limit);
 // #define set_base(addr, base) ()
 // #define set_limit(addr, limit) ()
 

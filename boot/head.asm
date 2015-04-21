@@ -12,7 +12,8 @@
 ; 4. jump to main.c
 
 extern main, printk
-extern _hint32_clock, _hint14_page_fault, _hint144_sys_call, _hint33_keyboard
+extern _hint14_page_fault, _hint144_sys_call
+extern _hint32_clock, _hint33_keyboard, _hint34_cascade, _hint46_AT
 global _start, _gdt, _idt, _tss
 
 %include "const.inc"
@@ -99,11 +100,18 @@ _func_setup_idt:
     mov [_idt + 8 * 32], ax
     shr eax, 16
     mov [_idt + 8 * 32 + 6], ax
-
     mov eax, _hint33_keyboard
     mov [_idt + 8 * 33], ax
     shr eax, 16
     mov [_idt + 8 * 33 + 6], ax
+    mov eax, _hint34_cascade
+    mov [_idt + 8 * 34], ax
+    shr eax, 16
+    mov [_idt + 8 * 34 + 6], ax
+    mov eax, _hint46_AT
+    mov [_idt + 8 * 46], ax
+    shr eax, 16
+    mov [_idt + 8 * 46 + 6], ax
 
     mov eax, _hint144_sys_call
     mov [_idt + 8 * 144], ax

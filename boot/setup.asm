@@ -43,7 +43,23 @@ SETUP_START:
     mov bp, 2
     call    PrintWord
 
-; check hd, get params
+; read & save floppy & hd params
+check_hd:
+    mov ah, 08h
+    mov dl, 80h
+    int 13h
+    jc check_hd
+    mov [6], cl
+    inc dh
+    mov [7], dh
+;check_floppy:
+;    mov ah, 08h
+;    mov dl, 00h
+;    int 13h
+;    jc check_floppy
+;    mov [10], cl
+;    inc dh
+;    mov [12], dh
 
 ; reset segment regs
     mov ax, cs

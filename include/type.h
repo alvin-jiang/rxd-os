@@ -9,9 +9,9 @@
 #ifndef __TYPE_H__
 #define __TYPE_H__
 
-typedef unsigned int DWORD;
-typedef unsigned short WORD;
-typedef unsigned char BYTE;
+typedef unsigned int uint32;
+typedef unsigned short uint16;
+typedef unsigned char uint8;
 
 typedef unsigned int size_t;
 
