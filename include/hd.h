@@ -18,3 +18,7 @@ extern void hd_init ();
 // extern int hd_rdwt (int start, char * buffer, int count);
 extern int hd_rdwt (int rw, int start_sect, int sect_cnt, void * buffer);
 extern void on_hd_interrupt (int int_nr);
+
+#define SECTOR_SIZE 512
+#define READ    0
+#define WRITE   1

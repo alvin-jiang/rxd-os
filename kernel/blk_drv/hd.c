@@ -55,7 +55,7 @@
 #define ALT_STATUS  DEV_CTRL
 
 // helper marcos
-#define IS_ATA() (!in_byte(0x1f4) && !in_byte(0x1f5))
+// #define IS_ATA() (!in_byte(0x1f4) && !in_byte(0x1f5))
 
 typedef struct hd_dev
 {
@@ -66,14 +66,15 @@ typedef struct hd_dev
 
 static hd_dev hd[2] = {{0, 0, 0}, {0, 0, 0}};
 
-int hd_signal;
+#define NORM_WAIT_TIME 10000
+#define LONG_WAIT_TIME 100000
 
-static int wait_status (int stat, int value)
+static int wait_status (int stat, int value, int time_out)
 {
-    int retries = 10000;
+    assert( time_out > 0 );
 
-    while (--retries && (in_byte(STATUS) & stat) != value);
-    return retries;
+    while (--time_out && (in_byte(STATUS) & stat) != value);
+    return time_out;
 }
 
 /* retrieve hard disk information */
@@ -81,9 +82,7 @@ static void hd_identity (uint8 dev_nr)
 {
     assert( dev_nr <= 1 );
 
-    sti();
-    hd_signal = 0;
-    out_byte(DEV_CTRL, 0);
+    out_byte(DEV_CTRL, DCTL_INT_OFF);
     out_byte(SECT_CNT, 0);
     out_byte(ADDR_0,  0);
     out_byte(ADDR_1, 0);
@@ -91,13 +90,12 @@ static void hd_identity (uint8 dev_nr)
     out_byte(DEVICE, (dev_nr << 4) | DEV_CHS);
     out_byte(COMMAND, CMD_IDENTIFY);
     if (!in_byte(STATUS)) {
-        printf("HD: disk %d not found\n", dev_nr);
-        cli();
+        printf("HD: no disk %d\n", dev_nr);
         return;
     }
-
-    while (!hd_signal);
-    cli();
+    if (!wait_status(STAT_BUSY, 0, LONG_WAIT_TIME)) {
+        panic("HD: disk identify failed.");
+    }
 
     /* read hard disk info */
     uint16 buf[256];
@@ -134,7 +132,7 @@ static void hd_cmd_out (uint8 dev_nr, uint8 cmd,/* uint8 features, */
         panic("HD: invalid sector count.");
     if (nsect_high != 0 | (nsect_low >= 0x10000000) )
         panic("HD: sorry, the largest capacity we support now is 128GB.");
-    if (!wait_status(STAT_BUSY, 0))
+    if (!wait_status(STAT_BUSY, 0, NORM_WAIT_TIME))
         panic("HD: controller not ready.");
 
     dev_reg = dev_nr << 4;
@@ -193,28 +191,27 @@ void hd_init (void)
 
 void on_hd_interrupt (int int_nr)
 {
-    hd_signal = 1;
+    // hd_signal = 1;
 }
 
-
+/* 
+    read/write disk
+    this function will busy wait until succeed
+*/
+#define DEFAULT_DISK 0
 int hd_rdwt (int rw, int start_sect, int sect_cnt, void * buffer)
 {
-    if (!wait_status(STAT_BUSY, 0)) {
+    if (!wait_status(STAT_BUSY, 0, NORM_WAIT_TIME)) {
         printf("HD: read/write failed, drive busy.\n");
         return -1;
     }
-    // NOTE: Do not use REP OUTSW to transfer data.
-    // There must be a tiny delay between each OUTSW output uint16_t.
-    // A jmp $+2 size of delay.
+    
     int i;
     char *p = buffer;
 
-    if (!rw) { // read
-        hd_signal = 0;
-        sti();
-        hd_cmd_out(0, CMD_READ, (uint32)sect_cnt, 0, 0);
-        while (!hd_signal);
-        cli();
+    if (rw == READ) {
+        hd_cmd_out(DEFAULT_DISK, CMD_READ, sect_cnt, start_sect, 0);
+
         while (sect_cnt--) {
             port_read(DATA, p, 512);
             for (i = 0; i < 30; ++i)
@@ -223,58 +220,30 @@ int hd_rdwt (int rw, int start_sect, int sect_cnt, void * buffer)
             p += 512;
         }
     }
-    else { // write
-        sti();
-        hd_signal = 0;
+    else if (rw = WRITE) {
+        // NOTE: Do not use REP OUTSW to transfer data.
+        // There must be a tiny delay between each OUTSW output uint16_t.
+        // A jmp $+2 size of delay.
+
+        // sti();
+        // hd_signal = 0;
 
         hd_cmd_out(0, CMD_WRITE, (uint32)sect_cnt, 0, 0);
 
         while (sect_cnt--) {
-            if (!wait_status(STAT_DRQ, STAT_DRQ))
+            if (!wait_status(STAT_DRQ, STAT_DRQ, NORM_WAIT_TIME))
                 panic("HD: writing error.");
 
             port_write(DATA, p, 512);
             p += 512;
 
-            while (!hd_signal);
-            hd_signal = 0;
+            // while (!hd_signal);
+            // hd_signal = 0;
         }
-        cli();
+        // cli();
     }
+    else
+        panic("HD: unknown cmd");
+
     return 0;
 }
-
-// void print_identify_info(uint16 * hdinfo)
-// {
-//     int i, k;
-//     char s[64];
-
-//     struct iden_info_ascii {
-//         int idx;
-//         int len;
-//         char * desc;
-//     } iinfo[] = {{10, 20, "HD SN"}, /* Serial number in ASCII */
-//              {27, 40, "HD Model"} /* Model number in ASCII */ };
-
-//     for (k = 0; k < sizeof(iinfo)/sizeof(iinfo[0]); k++) {
-//         char * p = (char*)&hdinfo[iinfo[k].idx];
-//         for (i = 0; i < iinfo[k].len/2; i++) {
-//             s[i*2+1] = *p++;
-//             s[i*2] = *p++;
-//         }
-//         s[i*2] = 0;
-//         printf("%s: %s\n", iinfo[k].desc, s);
-//     }
-
-//     int capabilities = hdinfo[49];
-//     printf("LBA supported: %s\n",
-//            (capabilities & 0x0200) ? "Yes" : "No");
-
-//     int cmd_set_supported = hdinfo[83];
-//     printf("LBA48 supported: %s\n",
-//            (cmd_set_supported & 0x0400) ? "Yes" : "No");
-
-//     int sectors = ((int)hdinfo[61] << 16) + hdinfo[60];
-//     printf("HD size: %dMB\n", sectors * 512 / 1000000);
-// }
-

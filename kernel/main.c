@@ -24,22 +24,13 @@ void main(void)
     printk("\n\n");
     printk("hello, RXD-OS!\n");
     print_boot_params();
-
     mem_init(0x100000, 0xffffff);
-    io_init();
 
-    hd_init();
-    char buffer[512 * 3];
-    hd_rdwt (0, 0, 3, buffer);
-    buffer[0] = 1;
-    buffer[512] = 2;
-    buffer[1024] = 3;
-    hd_rdwt (1, 0, 3, buffer);
-    printf("After write:\n");
-    hd_rdwt (0, 0, 3, buffer);
+    // hd_init();
+    // io_init();
     
     sched_init();
-    back_to_user_mode();
+    move_to_user_mode();
     
     while(1);
 }

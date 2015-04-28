@@ -1,3 +1,22 @@
+Kernel Stack Frame:
+    ss
+    esp
+    eflags
+    cs
+    eip
+    [error code]
+    eax
+    ecx
+    edx
+    ebx
+    _reserved
+    ebp
+    esi
+    edi
+    ds
+    es
+    fs
+    gs
 
 Memory Layout in RXD-OS Perspective:
 

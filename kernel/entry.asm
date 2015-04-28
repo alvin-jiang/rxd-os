@@ -8,8 +8,8 @@
 extern printk
 
 ; vars for user-mode & kernel-mode switch
-extern _tss, current_task, int_reenter
-global back_to_user_mode
+extern _tss, current_task
+global move_to_user_mode, ret_from_fork
 
 ; interrupt & syscall
 extern syscall_table, intcb_table
@@ -42,91 +42,92 @@ INT_S_CTLMASK equ 0xa1
 ALIGN 4
 [BITS 32]
 
-back_to_user_mode:
-    mov esp, [current_task]     ; esp -> task_struct
+move_to_user_mode:
+    ; set task kernel stack
+    ; tss esp0
+    mov esi, [current_task]
+    mov [_tss + 4], esi
+    add word [_tss + 4], PAGE_SIZE
 
+    ; switch memory
     ; load ldt
-    ; ldt index = GDT_IDX_FIRST_LDT + pid
-    mov eax, [esp]
+    mov eax, [esi]
     add eax, GDT_IDX_FIRST_LDT
     shl eax, 3
     lldt ax
 
-    add esp, 8                  ; esp -> rts
+    ; set return address
+    push 0x0f               ; ss
+    push dword [esi + 12]   ; esp
+    push 0x3200             ; eflags
+    push 0x07               ; cs
+    push dword [esi + 8]    ; eip
 
-    ; DEBUG
-    mov ax, 24
+    ; restore regs
+    mov ax, 0x1b
     mov gs, ax
-    mov byte [gs:80], 'k'
-    mov byte [gs:84], 'U'
-    inc byte [gs:86]
+    mov ax, 0x0f
+    mov fs, ax
+    mov es, ax
+    mov ds, ax
+    mov edi, 0
+    mov esi, 0
+    mov ebp, 0
+    mov ebx, 0
+    mov edx, 0
+    mov ecx, 0
+    mov eax, 0
 
-    ; set tss esp0 -> rts
-    ; so CPU know where to store regs during interrupt
-    lea eax, [esp + 76]
-    mov [_tss + 4], eax
-back_to_user_mode_reenter:
-    dec dword [int_reenter]
-    pop gs
-    pop fs
-    pop es
-    pop ds
-    popad
-    ; skip retaddr & error code
-    add esp, 8
-    ; ring0 -> ring3, trigger stack switch
+    ; return to user mode
     iretd
 
-; save regs & switch to kernel stack (set esp)
-enter_kernel_mode:
+%macro SAVE_ALL 0
     pushad
     push ds
     push es
     push fs
     push gs
+%endmacro
 
+%macro RESTORE_ALL 0
+    pop gs
+    pop fs
+    pop es
+    pop ds
+    popad
+%endmacro
+
+%macro SYS_ENTER 0
     mov bp, ss
     mov ds, bp
     mov es, bp
     mov fs, bp
-    ; mov gs, bp
-    mov ebp, esp                ; ebp -> rts
+%endmacro
 
-    inc     dword [int_reenter]
-    cmp     dword [int_reenter], 0
-    jne     .already_in_kernel_mode
-    ; set kernel stack pointer
-    mov     esp, [current_task]
-    add     esp, PAGE_SIZE
-    push    back_to_user_mode
-    jmp     [ebp + RTS_IDX_RETADDR]
-.already_in_kernel_mode:
-    push    back_to_user_mode_reenter
-    mov byte [gs:100], 'R'  ; DEBUG
-    inc byte [gs:102]       ; DEBUG
-    jmp     [ebp + RTS_IDX_RETADDR]
-
+; system call
 _hint144_sys_call:
-    sub esp, 4
-    call    enter_kernel_mode
+    SAVE_ALL
+    SYS_ENTER
 
     ; push params
     push edx
     push ebx
     push eax
     call    [syscall_table + ecx * 4]
+
     add esp, 12
+    RESTORE_ALL
+    iretd
 
-    ret
+ret_from_fork:
+    RESTORE_ALL
+    iretd
 
+; irq
 %macro  HINT_MASTER 1
-    sub esp, 4
-    call    enter_kernel_mode
-    mov ax, 24              ; DEBUG
-    mov gs, ax
-    mov byte [gs:80], 'K'
-    mov byte [gs:84], 'u'
-    inc byte [gs:82]
+    SAVE_ALL
+    SYS_ENTER
+
     in  al, 0x21            ; disable current interrupt
     or  al, (1 << %1)
     out 0x21, al
@@ -136,25 +137,21 @@ _hint144_sys_call:
     ;sti
     push %1
     call    [intcb_table + 4 * %1]
-    pop ecx             ; TODO: store interrupt number in ECX ??? why?
+    add esp, 4
     ;cli
 
     in  al, 0x21            ; enable current interrupt
     and al, ~(1 << %1)
     out 0x21, al
-    ; return to back_to_user_mode or back_to_user_mode_reenter,
-    ; depending on "int_reenter"
-    ret
+
+    RESTORE_ALL
+    iretd
 %endmacro
 
 %macro  HINT_SLAVE 1
-    sub esp, 4
-    call    enter_kernel_mode
-    mov ax, 24              ; DEBUG
-    mov gs, ax
-    mov byte [gs:80], 'S'
-    mov byte [gs:84], 'u'
-    inc byte [gs:82]
+    SAVE_ALL
+    SYS_ENTER
+
     in  al, 0xa1            ; disable current interrupt
     or  al, (1 << (%1 - 8))
     out 0xa1, al
@@ -166,21 +163,32 @@ _hint144_sys_call:
     ;sti
     push %1
     call    [intcb_table + 4 * %1]
-    pop ecx             ; TODO: store interrupt number in ECX ??? why?
+    add esp, 4
     ;cli
 
     in  al, 0xa1            ; enable current interrupt
     and al, ~(1 << (%1 - 8))
     out 0xa1, al
-    ; return to back_to_user_mode or back_to_user_mode_reenter,
-    ; depending on "int_reenter"
-    ret
+
+    RESTORE_ALL
+    iretd
 %endmacro
 
 ; Interrupt request routines 32~47
 ALIGN   16
-_hint32_clock:
-HINT_MASTER 0   ; irq 0 (the clock)
+_hint32_clock:  ; irq 0 (the clock)
+    SAVE_ALL
+    SYS_ENTER
+
+    mov al, 0x20            ; send EOI
+    out 0x20, al
+
+    push 0
+    call    [intcb_table + 4 * 0]
+    add esp, 4
+
+    RESTORE_ALL
+    iretd
 
 ALIGN   16
 _hint33_keyboard:
@@ -285,12 +293,24 @@ general_protection:
     jmp _exception
 
 _hint14_page_fault:
-    call    enter_kernel_mode
+    xchg [esp], eax
+    push ecx
+    push edx
+    push ebx
+    sub esp, 4
+    push ebp
+    push esi
+    push edi
+    push ds
+    push es
+    push fs
+    push gs
 
-    mov eax, [ebp + 52] ; error code
+    SYS_ENTER
+
     mov edx, cr2        ; error address
     push edx
-    push eax
+    push eax            ; error code
     test eax, 1
     jnz .1
     call    do_no_page
@@ -300,7 +320,8 @@ _hint14_page_fault:
 .2:
     add esp, 8
 
-    ret
+    RESTORE_ALL
+    iretd
 
 reserved:
     push 15

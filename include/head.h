@@ -87,6 +87,12 @@ void port_read (uint16 port, void * buf, int n);
 void port_write (uint16 port, void * buf, int n);
 void port_write2 (uint16 port, void * buf, int n);
 
+#define _LDT(n) ((((unsigned long) n)<<3)+(GDT_IDX_FIRST_LDT<<3))
+#define lldt(n) __asm__("lldt %%ax"::"a" (_LDT(n)))
+
+#define FASTCALL __attribute__((fastcall))
+// #define FASTCALL(func) func __attribute__((regparm(3)))
+
 // TODO: make this asm macro
 // void set_base(struct desc_struct *p_desc, uint32 base);
 // void set_limit(struct desc_struct *p_desc, uint32 limit);

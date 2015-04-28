@@ -29,7 +29,6 @@ int_callback intcb_table[INT_REQ_NR] = {
     on_unknown_irq,
     on_unknown_irq,
 };
-int int_reenter;
 
 void set_int_callback(int int_nr, int_callback hdl) {
     intcb_table[int_nr] = hdl;
