@@ -1,0 +1,287 @@
+TODO:
+nameidata 结构是什么？怎么用？ 缓存临时数据
+何处用 sector，何处用 block？
+
+0. 文件系统结构
+    [0]     Boot Sector
+    [1]     Super Block
+    [2]     Bit Map: inode
+    [3-n]   Bit Map: Block(Sector)
+    [n-m]   Inodes
+    [m-]    Data
+0.1 基本操作
+inode 分配：alloc_inode/free_inode
+dentry 分配：alloc_dentry/free_dentry
+file 分配：alloc_filp/free_filp
+bitmap：bitmap_alloc/bitmap_free
+bitops.h: fast code for bit manipulation
+
+1. 超级块对象 - 文件系统的抽象
+    识别：
+        魔数/s_magic
+        关联设备/s_dev
+    结构描述：
+        inode位图 起始、占用(区块数)
+        数据块位图 起始、占用
+        inode表 起始、占用
+        数据块 起始
+1.1 超级块操作
+*inode ops*
+struct inode * new_inode(struct super_block *sb)
+    磁盘分配 inode
+    依赖：bitmap_alloc(), iget(), ll_rw_block()
+void delete_inode(struct inode *inode)
+    磁盘删除 inode (包括文件数据)
+    依赖：bitmap_free(), iput(), ll_rw_block()
+    
+int read_inode(struct inode *inode)
+    读取 inode (通过 inode 参数传入结点号)
+    依赖：ll_rw_block()
+int write_inode(struct inode *inode)
+    写入 inode (通过 inode 参数传入结点号)
+    依赖：ll_rw_block()
+
+*super block ops*
+void write_super(struct inode *sb)
+    更新磁盘超级块
+    依赖：ll_rw_block()
+
+[ignore]
+    void clear_inode(struct inode *inode) inode 善后操作。
+    void put_super(struct inode *sb) 在卸载文件系统时调用，释放超级块
+    destroy_inode(inode) 释放 inode
+    put_inode(inode) 减少 inode 的引用计数
+    
+
+2. inode 对象 - 文件信息的抽象，从文件内容本身剥离而生
+    识别：
+        结点号         unsigned long i_ino;
+        关联超级块     struct super_block *i_super;
+    文件自身描述：
+        文件大小       loff_t i_size;
+        属性/类型      umode_t i_mode; trwxrwxrwx
+        // 文件关联设备    /* kdev_t i_rdev; */
+        // 最后修改时间    /* struct timespec i_mtime; */
+    外部描述：
+        硬链接数       unsigned int i_nlink;
+    占用区块描述：
+        直接块         unsigned long i_zone[9];
+        一级间接块
+        二级间接块
+        三级间接块
+    <子结构>
+    struct dir_entry {
+        u32 inode; // 结点号
+        u16 rec_len; // 当前 dir_entry 的长度
+        u8 name_len; // 文件名
+        u8 file_type; // 文件类型
+        char name[255]; // 仅仅内存中占255
+    };
+    文件类型 enum {
+        FT_UNKNOWN,
+        FT_REG_FILE,
+        FT_DIR,
+        FT_CHRDEV,
+        FT_BLKDEV,
+        FT_FIFO,
+        FT_SOCK,
+        FT_SYMLINK,
+        FT_MAX
+    };
+    dir_entry 宏
+        4字节对齐 #define EXT2_DIR_PAD 4
+        进位 #define EXT2_DIR_ROUND (EXT2_DIR_PAD - 1)
+        根据名字长度计算 dir_entry 长度
+        #define EXT2_DIR_REC_LEN(name_len)  (((name_len) + 8 + EXT2_DIR_ROUND) & ~EXT2_DIR_ROUND)
+2.1 inode 操作
+*file*
+int create(struct inode *dir,
+           struct dentry *dentry,
+           int mode,
+           struct nameidate *nd)
+    为 dentry 声明的普通文件创建一个新索引节点（比如 link 系统调用？）
+    依赖：事先创建好 dentry, alloc_inode()
+
+struct dentry * lookup(struct inode *dir,
+                       struct dentry *dentry,
+                       struct nameidata *nd)
+    在 dir 中查找 dentry 声明的索引节点(此函数通常递归调用)
+    依赖：dir_entry 宏, ll_rw_block()
+
+void truncate(struct inode *inode)
+    修改文件大小，新的大小在传入的 inode 中声明
+    依赖：ll_rw_block()
+
+int permission(struct inode *inode,
+               int mask)
+    访问模式检查
+
+*filesystem*
+int link(struct dentry *old_dentry,
+         struct inode *dir,
+         struct dentry *new_dentry)
+    创建新的硬链接 new_dentry，指向 dir 下的 old_dentry
+    依赖：ll_rw_block()
+int unlink(struct inode *dir,
+           struct dentry *dentry)
+    删除硬链接
+    依赖：ll_rw_block()
+int mkdir(struct inode *dir,
+          struct dentry *dentry,
+          int mode)
+    在 dir 下创建 dentry 声明的目录
+    依赖：ll_rw_block()
+int rmdir(struct inode *dir,
+          struct dentry *dentry)
+int rename(struct inode *old_dir,
+           struct dentry *old_dentry,
+           struct inode *new_dir,
+           struct dentry *new_dentry)
+    
+[ignore]
+    symlink(dir, dentry, symname)
+    readlink(dentry, buffer, buflen) 读取符号链接
+    follow_link(inode, nameidata) 解析符号链接
+    put_link(dentry, nameidata) 释放 follow_link 的临时数据
+    mknod(dir, dentry, mode, rdev) 创建特殊文件（设备文件、命名管道或套接字）
+
+3. dentry 目录项对象 - 路径查找中的每一个分量(路径/文件)都是一个目录项
+    识别：
+        目录项名称(文件名/路径名)    struct qstr d_name;
+    结构：
+        父目录项指针                struct dentry *d_parent;
+    连接 inode:
+        对应 inode 指针             struct inode *d_inode;
+    <子结构>
+    struct qstr {
+        /* unsigned int hash; */
+        unsigned int len;
+        const unsigned char *name;
+    }
+3.1 目录项对象 操作
+    文件名比较(若 dentry->d_op->d_compare 为NULL，默认进行字符串比较)
+    int d_compare(struct dentry *dentry,
+                  struct qstr *name1,
+                  struct qstr *name2)
+[ignore]
+    d_revalidate(dentry, nameidata) 目录对象是否有效
+    d_hash(dentry, name)
+    d_delete(dentry)
+    d_release(dentry)
+
+4. 文件对象 - 进程眼中的“文件”
+    编辑描述：
+        打开方式(flags，读/写/创造/添加/...)   unsigned int f_flags;
+        访问模式(mode，组/用户/系统+读/写/执行) mode_t f_mode;
+        位置(文件指针)                        loff_t f_pos;
+    共享：
+        引用计数                             atomic_t f_count;
+    连接 dentry:
+        对应 dentry 指针                     struct dentry *f_dentry;
+4.1 文件对象 操作
+int open(struct inode *inode,
+         struct file *file)
+    创建新的文件对象，并和 inode 关联起来(open系统调用，通过 lookup 和此函数实现）
+
+ssize_t read(struct file *file,
+             char *buf,
+             size_t count,
+             loff_t *offset)
+    从文件的 *offset 处读取 count 个字节，并增加 *offset 的值
+    依赖：ll_rw_block()
+
+ssize_t write(struct file *file,
+             const char *buf,
+             size_t count,
+             loff_t *offset)
+    从文件的 *offset 处写入 count 个字节，并增加 *offset 的值
+    依赖：ll_rw_block()
+
+loff_t llseek(struct file *file,
+              loff_t offset,
+              int origin)
+    更新文件指针
+
+int readdir(struct file *file,
+            void *dirent, filldir_t filldir)
+    读取 dir 下的下一个目录项，存入 dirent
+
+    回调：文件对象引用计数为 0 时
+    int release(struct inode *inode,
+                struct file *file)
+    将给定文件的所有缓存数据同步到磁盘
+    int fsync(struct file *file,
+              struct dentry *dentry,
+              int datasync)
+
+[ignore]
+    int flush(struct file *file) 回调：已打开文件的引用计数减少时
+    ioctl(inode, file, cmd, arg) 向硬件设备发送命令（只适用于设备文件）
+    mmap(file, vma) 执行文件内存映射
+    aio_read(req, buf, len, pos)
+    poll(file, poll_table) 睡眠等待给定文件活动
+    aio_fsync(req, flag)
+
+
+5. 系统调用
+进程相关:
+    flags: 
+    mode: 读/写/执行 权限设置，仅当 O_CREAT 设置时有效
+    int open(const char *pathname, int flags);
+    int open(const char *pathname, int flags, mode_t mode);
+    int creat(const char *pathname, mode_t mode);
+    int close(int fd);
+
+    ssize_t read(int fd, void *buf, size_t count);
+    ssize_t write(int fd, const void *buf, size_t count);
+    off_t lseek(int fd, off_t offset, int whence);
+    int dup(int oldfd); // 复制已打开的文件描述字
+    int dup2(int oldfd, int newfd); // 按指定条件复制文件描述字
+    int truncate(const char *path, off_t length);
+
+    fcntl   文件控制
+    umask   设置文件权限掩码
+    fsync   把文件在内存中的部分写回磁盘
+
+文件树结构：
+    readdir 读取目录项
+    getdents    读取目录项
+    mkdir   创建目录
+    mknod   创建索引节点
+    rmdir   删除目录
+    rename  文件改名
+    link    创建链接
+    unlink  删除链接
+    mount   安装文件系统
+
+[暂时不支持]
+    flock   文件加/解锁
+    poll    I/O多路转换
+    ftruncate   参见truncate
+    readv   从文件读入数据到缓冲数组中
+    writev  将缓冲数组里的数据写入文件
+    pread   对文件随机读
+    pwrite  对文件随机写
+    _llseek 在64位地址空间里移动文件指针
+
+    access  确定文件的可存取性
+    chdir   改变当前工作目录
+    chmod   改变文件方式
+    symlink 创建符号链接
+    readlink    读符号链接的值
+    fchdir  参见chdir
+    fchmod  参见chmod
+    chown   改变文件的属主或用户组
+    fchown  参见chown
+    lchown  参见chown
+    chroot  改变根目录
+    stat    取文件状态信息
+    lstat   参见stat
+    fstat   参见stat
+    statfs  取文件系统信息
+    fstatfs 参见statfs
+    umount  卸下文件系统
+    ustat   取文件系统信息
+    utime   改变文件的访问修改时间
+    utimes  参见utime
+    quotactl    控制磁盘配额

@@ -1,0 +1,107 @@
+现在要解决的问题：
+bread/bwrite 的接口
+文件读写流程
+
+
+[块设备IO] 一个足够复杂的系统！
+层次：
+    文件系统：发出数据请求，read()，write()
+        向下层发出请求队列
+    ↓
+    抽象数据请求，bio，bread(), bwrite()
+        在磁盘高速缓冲区中查找数据，find_buffer(dev, block)
+        找不到则调用底层 ll_rw_block() 读入块到高速缓冲区不
+    ↓
+    块设备驱动程序：ll_rw_block()
+        IO调度(linus电梯), do_hd_request()
+
+[1] 磁盘高速缓存
+缓冲区 - 磁盘数据在内存中的表示
+    关键结构
+        buffer_head：代表 磁盘块 到 内存 的映射
+        bio：？？
+    结构实现：
+    struct buffer_head {
+        // 映射位置
+        int b_dev; // 设备号
+        int b_blocknr; // 块号
+
+        // 映射有效性 与 映射数据
+        int b_valid; // bread()负责检查，无效则自动读取相应磁盘块
+        char *b_data;
+
+        // 写&同步
+        int b_dirty; // 脏标记
+        int b_count; // 引用计数
+        int b_lock; // 锁
+        int b_wait; // 等待进程
+
+        // 查找&分配 辅助结构
+        struct buffer_head *b_prev_hash;
+        struct buffer_head *b_next_hash;
+        struct buffer_head *b_prev_free;
+        struct buffer_head *b_next_free;
+    };
+    alloc_buffer()/free_buffer()
+    find_buffer(dev, block)
+    bread()/bwrite()
+    sync()
+    *ref:Linux内核设计与实现
+    *b_valid, b_dirty, b_lock 可以合并成 b_state
+
+[2] 电梯算法
+Linus 电梯
+
+[3] 块设备驱动
+    // 用于分区表
+    struct hd_struct {
+        sector_t start_sect;
+        sector_t nr_sects;
+    };
+
+
+
+
+其他相关问题：
+1. 直接IO怎么实现？
+    进程跳过页高速缓冲区，使用进程自己的地址空间进行缓冲。
+2. 页高速缓存 - 缓存任何基于页的对象！
+[[关键问题]]
+    缓存写
+        1. nowrite: 写磁盘 + 使内存数据失效
+            - 需额外的逻辑使缓存数据失效
+            - 不具备缓存优势
+        2. write-through: 同时写内存 + 写磁盘
+            + 实现简单
+            - 不具备缓存优势
+        3. write-back：写内存 + 脏标记，统一回写
+            ++ 具备缓存优势
+            - 内存数据与磁盘数据不一致（如果遇到断电之类的。。。）
+            ? 回写策略(flusher线程) = 超时，避免饥饿/需要回收内存/程序主动请求
+    占用资源管理 - 内存申请与回收
+        1. LRU，最近最少使用
+        2. 双链策略
+    如何检查缓存命中？
+        1. 全局散列表
+            - 需要一个全局锁，粒度太大
+            - 因为是全局的，搜索噪音太多（是否可改进？）
+            - 散列表都有的缺点：
+                a) 占用内存大
+                b) 需要探索整条搜索序列，来确认搜索失败
+        2. 基于基树(radix tree)
+[[实现]]
+    基本操作：
+        增加缓存页
+        查找缓存页
+        回收
+        写缓存逻辑：脏记录、回写
+    缓存内容：
+        * 普通文件数据
+        * 目录项
+        * 直接块设备数据(为了效率，按页访问)
+        * (暂不支持)进程数据页
+        * (暂不支持)特殊文件系统的页，比如共享内存 shm，参见"linux内核" P596
+    元结构：
+    struct page_cache {
+
+    };

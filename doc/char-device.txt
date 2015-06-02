@@ -1,0 +1,30 @@
+I/O system:
+
+[PART 1] Char Device: TTY & CONSOLE
+
+1. io.asm
+
+put_queue: <keyboard> -> read_q
+
+2. tty
+tty_q {
+    int head, tail, count;
+    int buffer[];
+}
+tty_struct {
+    tty_ctl ctrl;
+    tty_q read, write;
+}
+
+copy_to_cooked: read_q -> secondary
+tty_read: secondary -> <user space>
+tty_write: <user space> -> write_q
+
+3. console
+con_write: write_q -> <video mem>
+
+[PART 2] Block Device: hard disk & floppy
+
+buffer_head ???
+
+    
