@@ -154,9 +154,10 @@ _func_get_boot_dev_params: ; support floppy & hard disk
     ret
 
 _func_read_boot_dev:
+; NOTE: if sector size is 512B, max read data size is 512 * 255 = 127.5KB
 ; in:
 ;   ax - Start Sector(LBA)
-;   cl - Count to Read
+;   cl - Count to Read(1-255)
 ;   es:bx - Result Output
 
     push es
@@ -184,7 +185,7 @@ _func_read_boot_dev:
 
     mov al, [bSecReadCnt]       ; AL - number of sectors to read (>0)
     cmp al, 64 ; 64 sectors max per read
-    jle .do_read
+    jbe .do_read
     mov al, 64
 
 .do_read:
