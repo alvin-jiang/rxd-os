@@ -76,19 +76,39 @@ check_hd:
 ; move kernel to memory 0x00000
     push ds
     push es
+
     mov ax, INIT_SEGMENT
     mov ds, ax
-    mov cl, [ds:509]
-    movzx cx, cl
-    shl cx, 8       ; cx = kernel size in words
+    mov ax, 0
+    mov al, [ds:509]
+    shl ax, 8       ; ax = kernel size in words
+
     mov bx, KERNEL_SEGMENT0
     mov ds, bx
     mov bx, 0x0000
     mov es, bx
+    cld
+.move_kernel:
+    cmp ax, 0
+    jz .move_kernel_end
+    mov cx, ax
+    cmp cx, 0x4000  ; 16K words = 32KB
+    jbe .move_1
+    mov cx, 0x4000
+.move_1:
+    sub ax, cx
     xor si, si
     xor di, di
-    cld
     rep movsw       ; ds:si -> es:di
+    mov bx, ds
+    add bx, 0x800
+    mov ds, bx
+    mov bx, es
+    add bx, 0x800
+    mov es, bx
+    jmp .move_kernel
+.move_kernel_end:
+
     pop es
     pop ds
 
