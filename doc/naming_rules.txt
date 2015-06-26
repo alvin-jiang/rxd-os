@@ -4,3 +4,26 @@ ASM:
     CONST_VALUE
 
     external_label
+
+C:
+    指针变量？
+        varp, p_var, var, var_ptr, ...
+    双重指针变量？
+        varpp, pp_var, var_pp, ...
+    指针的*
+        全部跟随变量名（指针变量定义，指针参数，指针成员）
+    ...的数值？
+        var_nr: number of var (inode number, block number)
+        nvar: count of var (block count)
+        var_len: length of string, record
+        ...
+    struct 的定义 & 使用？
+        struct {} Cheeze;           -> struct Cheeze c;
+        typedef struct {} Cheeze;   -> Cheeze c;
+        typedef struct Cheeze {} SCheeze; -> SCheeze c; / struct Cheeze c;
+        typedef struct cheeze {} cheeze_t;
+
+    类型统一：
+        字符串 typedef unsigned char * string_t;
+        未知内存 void *
+        可以运算的地址 typedef unsigned long maddr_t;

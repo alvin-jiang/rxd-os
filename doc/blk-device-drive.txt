@@ -1,22 +1,36 @@
 现在要解决的问题：
-bread/bwrite 的接口
-文件读写流程
+比较完整的实现 bread/bwrite/brelse
+BLOCK_SIZE 大小无关机制
+hash 搜索机制
 
+[块设备IO]
+    外部接口 - blk.h
+        bread(dev, blk_nr)
+        bwrite(bh)
+        brelse(bh)
+    高速缓冲区 - blk.h
+        struct buffer_head {...}
+        *缓存写策略：nowrite, write-through, write-back
+    底层驱动统一接口 - blk.h blk.c
+        ll_rw_block(dev, rw, blk_nr, cnt, buf)
+        *接受请求，调用相应驱动完成请求，并通知相关进程
+        *电梯算法
+        *错误处理
+    底层驱动 - blk.h hd.c ramdisk.c
+        open(mount)/close(unmount)/read/write/ioctl
+        *RAMDISK：初始化使用的内存、读写内存
+        *硬盘驱动：初始化硬盘（识别、获取参数）、读写硬盘、错误处理
 
-[块设备IO] 一个足够复杂的系统！
-层次：
-    文件系统：发出数据请求，read()，write()
-        向下层发出请求队列
-    ↓
-    抽象数据请求，bio，bread(), bwrite()
-        在磁盘高速缓冲区中查找数据，find_buffer(dev, block)
-        找不到则调用底层 ll_rw_block() 读入块到高速缓冲区不
-    ↓
-    块设备驱动程序：ll_rw_block()
-        IO调度(linus电梯), do_hd_request()
+[0] 外部接口
+    结构：
+        struct buffer_head {...};
+    函数：
+        struct buffer_head * bread(dev_t dev, int blk_nr);
+        int bwrite(bh);
+        int brelse(bh);
+    实现：
 
-[1] 磁盘高速缓存
-缓冲区 - 磁盘数据在内存中的表示
+[1] 高速缓冲区 - 块设备数据在内存中的表示
     关键结构
         buffer_head：代表 磁盘块 到 内存 的映射
         bio：？？
@@ -52,15 +66,14 @@ bread/bwrite 的接口
 [2] 电梯算法
 Linus 电梯
 
-[3] 块设备驱动
+[3] 硬盘驱动
     // 用于分区表
     struct hd_struct {
         sector_t start_sect;
         sector_t nr_sects;
     };
 
-
-
+-------------------------------------------------------------------------
 
 其他相关问题：
 1. 直接IO怎么实现？

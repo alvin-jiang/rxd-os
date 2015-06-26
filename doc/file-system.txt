@@ -1,6 +1,3 @@
-TODO:
-nameidata 结构是什么？怎么用？ 缓存临时数据
-何处用 sector，何处用 block？
 
 0. 文件系统结构
     [0]     Boot Sector
@@ -285,3 +282,14 @@ int readdir(struct file *file,
     utime   改变文件的访问修改时间
     utimes  参见utime
     quotactl    控制磁盘配额
+
+已解决:
+nameidata 结构是什么？怎么用？ 缓存临时数据
+何处用 sector，何处用 block？ 暂时不管
+允不允许文件中间有洞(未映射到具体磁盘块)？ 为了简单起见，现在不允许
+zone 的概念？ 逻辑块号，比如文件的第3块，就是文件的第三个zone，实际的物理块号通过 inode->i_zone 计算得到
+
+待解决：
+定长 dir_entry 在磁盘上怎么管理？ 
+变长 dir_entry 呢？
+
