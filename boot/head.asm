@@ -11,7 +11,7 @@
 ; 3. setup Paging
 ; 4. jump to main.c
 
-extern main, printk
+extern kmain, printk
 extern _hint14_page_fault, _hint144_sys_call
 extern _hint32_clock, _hint33_keyboard, _hint34_cascade, _hint46_AT
 global _start, _gdt, _idt, _tss
@@ -69,7 +69,7 @@ _after_page_table:
     push 0 ; argv
     push 0 ; argc
     push _return_from_main
-    push main
+    push kmain
     ret
 
 _return_from_main:

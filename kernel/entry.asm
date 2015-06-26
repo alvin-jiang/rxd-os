@@ -6,14 +6,14 @@
 ;
 
 extern printk
+global copy_from_user, strncpy_from_user
 
 ; vars for user-mode & kernel-mode switch
 extern _tss, current_task
 global move_to_user_mode, ret_from_fork
 
 ; interrupt & syscall
-extern syscall_table, intcb_table
-global enable_int, disable_int
+extern syscall_table, irqhdl_table
 ; handlers
 global _hint144_sys_call, _hint14_page_fault
 global _hint32_clock, _hint33_keyboard, _hint34_cascade, _hint46_AT
@@ -27,13 +27,12 @@ global device_not_available, double_fault, coprocessor_segment_overrun
 global invalid_TSS, segment_not_present, stack_segment, general_protection
 global reserved, coprocessor_error
 
-; I/O
-global in_byte, out_byte, port_read, port_write, port_write2
-
-KERNEL_STACK_TOP    equ 0x90000
 PAGE_SIZE           equ 4096
 GDT_IDX_FIRST_LDT   equ 5
-RTS_IDX_RETADDR     equ 48
+
+OFFSET_PID          equ 0
+OFFSET_THREAD_EIP   equ 4
+OFFSET_THREAD_ESP   equ 8
 
 INT_M_CTLMASK equ 0x21
 INT_S_CTLMASK equ 0xa1
@@ -43,25 +42,24 @@ ALIGN 4
 [BITS 32]
 
 move_to_user_mode:
-    ; set task kernel stack
-    ; tss esp0
+    ; set task kernel stack, tss.esp0 = current_task + PAGE_SIZE
     mov esi, [current_task]
     mov [_tss + 4], esi
     add word [_tss + 4], PAGE_SIZE
 
     ; switch memory
-    ; load ldt
-    mov eax, [esi]
+    ; load ldt, ldt index = pid + first_ldt
+    mov eax, [esi + OFFSET_PID]
     add eax, GDT_IDX_FIRST_LDT
     shl eax, 3
     lldt ax
 
     ; set return address
     push 0x0f               ; ss
-    push dword [esi + 12]   ; esp
+    push dword [esi + OFFSET_THREAD_ESP]    ; esp
     push 0x3200             ; eflags
     push 0x07               ; cs
-    push dword [esi + 8]    ; eip
+    push dword [esi + OFFSET_THREAD_EIP]    ; eip
 
     ; restore regs
     mov ax, 0x1b
@@ -81,17 +79,64 @@ move_to_user_mode:
     ; return to user mode
     iretd
 
+; void copy_from_user(char * kaddr, const char * uaddr)
+copy_from_user:
+    push ebp
+    mov ebp, esp
+    push esi
+    push edi
+
+    ; fs:esi -> es:edi
+    mov edi, [ebp + 8]
+    mov esi, [ebp + 12]
+.loop:
+    mov al, [fs:esi]
+    mov [es:edi], al
+    cmp byte [fs:esi], 0
+    je .end
+    inc edi
+    inc esi
+    jmp .loop
+.end:
+    pop edi
+    pop esi
+    pop ebp
+    ret
+
+; void strncpy_from_user(char * kaddr, const char * uaddr, int count)
+strncpy_from_user:
+    push ebp
+    mov ebp, esp
+    push esi
+    push edi
+
+    ; fs:esi -> es:edi
+    mov edi, [ebp + 8]
+    mov esi, [ebp + 12]
+    mov ecx, [ebp + 16]
+.loop:
+    cmp ecx, 0
+    je .end
+    mov al, [fs:esi]
+    mov [es:edi], al
+    inc edi
+    inc esi
+    dec ecx
+    jmp .loop
+.end:
+    pop edi
+    pop esi
+    pop ebp
+    ret
+
+
 %macro SAVE_ALL 0
     pushad
     push ds
     push es
-    push fs
-    push gs
 %endmacro
 
 %macro RESTORE_ALL 0
-    pop gs
-    pop fs
     pop es
     pop ds
     popad
@@ -101,7 +146,6 @@ move_to_user_mode:
     mov bp, ss
     mov ds, bp
     mov es, bp
-    mov fs, bp
 %endmacro
 
 ; system call
@@ -111,11 +155,12 @@ _hint144_sys_call:
 
     ; push params
     push edx
+    push ecx
     push ebx
-    push eax
-    call    [syscall_table + ecx * 4]
-
+    call    [syscall_table + eax * 4]
     add esp, 12
+    mov [esp + 9 * 4], eax  ; set return value
+
     RESTORE_ALL
     iretd
 
@@ -136,7 +181,7 @@ ret_from_fork:
 
     ;sti
     push %1
-    call    [intcb_table + 4 * %1]
+    call    [irqhdl_table + 4 * %1]
     add esp, 4
     ;cli
 
@@ -162,7 +207,7 @@ ret_from_fork:
 
     ;sti
     push %1
-    call    [intcb_table + 4 * %1]
+    call    [irqhdl_table + 4 * %1]
     add esp, 4
     ;cli
 
@@ -184,7 +229,7 @@ _hint32_clock:  ; irq 0 (the clock)
     out 0x20, al
 
     push 0
-    call    [intcb_table + 4 * 0]
+    call    [irqhdl_table + 4 * 0]
     add esp, 4
 
     RESTORE_ALL
@@ -303,8 +348,6 @@ _hint14_page_fault:
     push edi
     push ds
     push es
-    push fs
-    push gs
 
     SYS_ENTER
 
@@ -335,106 +378,3 @@ _exception:
     add esp, 8
     jmp $
 
-
-
-disable_int:
-        mov     ecx, [esp + 4]          ; irq
-        pushf
-        cli
-        mov     ah, 1
-        rol     ah, cl                  ; ah = (1 << (irq % 8))
-        cmp     cl, 8
-        jae     disable_8               ; disable irq >= 8 at the slave 8259
-disable_0:
-        in      al, INT_M_CTLMASK
-        test    al, ah
-        jnz     dis_already             ; already disabled?
-        or      al, ah
-        out     INT_M_CTLMASK, al       ; set bit at master 8259
-        popf
-        mov     eax, 1                  ; disabled by this function
-        ret
-disable_8:
-        in      al, INT_S_CTLMASK
-        test    al, ah
-        jnz     dis_already             ; already disabled?
-        or      al, ah
-        out     INT_S_CTLMASK, al       ; set bit at slave 8259
-        popf
-        mov     eax, 1                  ; disabled by this function
-        ret
-dis_already:
-        popf
-        xor     eax, eax                ; already disabled
-        ret
-
-enable_int:
-    mov     ecx, [esp + 4]          ; irq
-    pushf
-    cli
-    mov     ah, ~1
-    rol     ah, cl                  ; ah = ~(1 << (irq % 8))
-    cmp     cl, 8
-    jae     enable_8                ; enable irq >= 8 at the slave 8259
-enable_0:
-    in      al, INT_M_CTLMASK
-    and     al, ah
-    out     INT_M_CTLMASK, al       ; clear bit at master 8259
-    popf
-    ret
-enable_8:
-    in      al, INT_S_CTLMASK
-    and     al, ah
-    out     INT_S_CTLMASK, al       ; clear bit at slave 8259
-    popf
-    ret
-
-; void out_byte(u16 port, u8 value);
-out_byte:
-    mov edx, [esp + 4]      ; port
-    mov al, [esp + 4 + 4]   ; value
-    out dx, al
-    nop
-    nop
-    ret
-
-; u8 in_byte(u16 port);
-in_byte:
-    mov edx, [esp + 4]      ; port
-    xor eax, eax
-    in  al, dx
-    nop
-    nop
-    ret
-
-; void port_read(u16 port, void* buf, int n);
-port_read:
-    mov edx, [esp + 4]      ; port
-    mov edi, [esp + 4 + 4]  ; buf
-    mov ecx, [esp + 4 + 4 + 4]  ; n
-    shr ecx, 1
-    cld
-    rep insw
-    ret
-
-; void port_write(u16 port, void* buf, int n);
-port_write:
-    mov edx, [esp + 4]      ; port
-    mov esi, [esp + 4 + 4]  ; buf
-    mov ecx, [esp + 4 + 4 + 4]  ; n
-    shr ecx, 1
-    cld
-    rep outsw
-    ret
-
-port_write2:
-    mov edx, [esp + 4]      ; port
-    mov esi, [esp + 4 + 4]  ; buf
-    mov ecx, [esp + 4 + 4 + 4]  ; n
-    shr ecx, 1
-    cld
-.loop:
-    outsw
-    jmp $ + 2
-    loop .loop
-    ret

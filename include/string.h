@@ -15,7 +15,10 @@ void * memcpy (void * dst, const void * src, size_t num);
 void * memmove (void * dst, const void * src, size_t num);
 void * memset (void * ptr, int value, size_t num);
 char * strcpy (char * dst, const char * src);
+char * strchr (char * str, int character);
 size_t strlen (const char * str);
+char * strncpy ( char * dst, const char * src, size_t num );
+int strncmp ( const char * str1, const char * str2, size_t num );
 
 #endif
 

@@ -11,17 +11,28 @@
 #define __PROC_H__
 
 #include "head.h"
+#include "fs.h"
 
 struct thread_info {
-    uint32 eip, esp;    /* used only in switch_to */
+    unsigned long eip, esp;    /* used only in switch_to */
     struct desc_struct ldt[2];
 };
 
+#define NR_MAX_OPEN 10
+
 struct task_struct {
+    /* touch this should change entry.h & entry.asm */
     int pid;
-    struct task_struct *next;
     struct thread_info thread;
+
+    /* add new members here */
+    int priority;
+    int timespan;
+    /* fs */
+    struct file * filp[NR_MAX_OPEN];
 };
+
+#define NR_TASK 64
 
 #define TASK_RUNNING            0
 // #define TASK_INTERRUPTIBLE      1
@@ -29,33 +40,38 @@ struct task_struct {
 // #define TASK_ZOMBIE             3
 // #define TASK_STOPPED            4
 
-// base = 0, limit = 0x9f000
+// base = 0, limit = 0xfff000
 #define INIT_TASK { \
     0, \
-    &init_task.task, \
-    { (uint32)&init, (uint32)&(init_task.ustack) + PAGE_SIZE, \
-        {{0x9f, 0xc0fa00}, {0x9f, 0xc0f200}}}}
+    { (u32)&init, (u32)&(init_task.ustack) + PAGE_SIZE, \
+        {{0xfff, 0xc0fa00}, {0xfff, 0xc0f200}} \
+    }, \
+    10, \
+    10, \
+/* other */ }
 
 extern struct task_struct *current_task;
-extern void exception_handler(uint32 exp_nr, uint32 err_code, uint32 eip, uint32 cs, uint32 eflags);
 
 void set_ldt_desc (struct task_struct *p_task);
 
 void sched_init();
 
-void init();
+extern int get_pid (void);
+extern void add_task(struct task_struct * task);
+extern void copy_process(struct task_struct * child, struct task_struct * parent);
 
+extern void schedule(void);
 extern void sleep_on(struct task_struct ** p);
 extern void wake_up(struct task_struct ** p);
-extern int fork (void);
-
 extern void dump_task (struct task_struct *p);
 
 /*
-    switch_to store non-volatile regs on stack,
+    switch_to stores non-volatile regs on stack,
     including esi, edi, eflags, ebp
 */
 #define switch_to(prev,next,last) do { \
+    if ((prev) == (next)) \
+        break; \
     unsigned long esi,edi; \
     asm volatile("pushfl\n\t" \
              "pushl %%ebp\n\t" \

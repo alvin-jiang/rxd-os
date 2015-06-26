@@ -1,14 +1,8 @@
 #########################
-# Makefile for Orange'S #
+#  Makefile for RXD-OS  #
 #########################
 
-# Entry point of Orange'S
-# It must have the same value with 'KernelEntryPointPhyAddr' in load.inc!
 ENTRYPOINT	= 0x0000
-
-# Offset of entry point in kernel file
-# It depends on ENTRYPOINT
-ENTRYOFFSET	=   0x400
 
 # Programs, flags, etc.
 # so "echo -e" will not output "-e"
@@ -21,7 +15,7 @@ ASMBIN	= -I boot/
 ASMOBJ	= -I boot/ -f elf32
 
 CC		= gcc
-CFLAGS	= -I include/ -m32 -c -fno-builtin -fno-stack-protector -Werror
+CFLAGS	= -I include -I kernel/blk_drv -m32 -c -nostdlib -fno-builtin -fno-stack-protector -Werror -Wall
 #-Wpadded -Wall
 LD		= ld
 LDFLAGS		= -m elf_i386 --oformat=binary -Map krnl.map -Ttext $(ENTRYPOINT)
@@ -38,12 +32,14 @@ kernelsrc = ./boot/head.asm \
 	$(wildcard ./kernel/*.asm) \
 	$(wildcard ./kernel/*.c) \
 	$(wildcard ./kernel/blk_drv/*.c) \
-	$(wildcard ./mm/*.c)
+	$(wildcard ./mm/*.c) #\
+	# $(wildcard ./fs/*.c)
 kernelobjs = ./boot/head.o \
 	$(patsubst %.asm, %.o, $(wildcard ./kernel/*.asm)) \
 	$(patsubst %.c, %.o, $(wildcard ./kernel/*.c)) \
 	$(patsubst %.c, %.o, $(wildcard ./kernel/blk_drv/*.c)) \
-	$(patsubst %.c, %.o, $(wildcard ./mm/*.c)) \
+	$(patsubst %.c, %.o, $(wildcard ./mm/*.c)) #\
+	# $(patsubst %.c, %.o, $(wildcard ./fs/*.c))
 
 libsrc = $(wildcard ./lib/*.asm) $(wildcard ./lib/*.c)
 libobjs = $(patsubst %.asm, %.o, $(wildcard ./lib/*.asm)) \

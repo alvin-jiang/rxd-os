@@ -19,7 +19,7 @@ static struct tty_struct tty_table[1] = {
 
 void on_keyboard_interrupt (int int_nr)
 {
-    unsigned char scan_code = in_byte(0x60);
+    unsigned char scan_code = inb(0x60);
     struct tty_struct *tty = &(tty_table[current_tty]);
     struct tty_queue *q = &(tty->read_q);
     // printf("<0x%x>", scan_code);
@@ -179,7 +179,7 @@ void io_init (void)
     tty_init(&tty_table[0]);
 
     // init keyboard
-    set_int_callback(1, on_keyboard_interrupt);
-    enable_int(1);
+    set_irq_handler(IRQ1_KEYBOARD, on_keyboard_interrupt);
+    enable_irq(IRQ1_KEYBOARD);
 }
 

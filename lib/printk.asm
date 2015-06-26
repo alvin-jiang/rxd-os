@@ -39,14 +39,20 @@ printk:
     mov cl, byte [esi]
     cmp cl, 0
     je .end
+    cmp cl, 09h     ; '\t'
+    je .print_tab
     cmp cl, 0ah     ; '\n'
-    je .no_print
+    je .print_nl
     cmp cl, 0dh     ; '\r'
-    je .no_print_0
+    je .print_cr
     jmp .print
-.no_print:
+.print_tab:
+    and eax, 0xfffffff0 ; tab width = 8
+    add eax, 16
+    jmp .next
+.print_nl:
     inc dh
-.no_print_0:
+.print_cr:
     mov dl, 0
     mov al, 80
     mul dh

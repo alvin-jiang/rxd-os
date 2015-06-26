@@ -10,13 +10,15 @@
 #define __STDIO_H__
 
 // #define EOF (-1)
+#include "stdarg.h"
 
-// klib.asm
+// printk.asm
 void printk (const char *s);
 
 // printf.c
 int printf (const char *fmt, ...);
 int sprintf (char *s, const char *fmt, ...);
+int vsprintf (char * str, const char * fmt, va_list args );
 // int puts (const char *s);
 #define puts(str) printk(str)
 
