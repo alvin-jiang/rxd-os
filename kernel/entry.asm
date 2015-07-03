@@ -6,7 +6,7 @@
 ;
 
 extern printk
-global copy_from_user, strncpy_from_user
+global memcpy_from_user, memcpy_to_user, strncpy_from_user
 
 ; vars for user-mode & kernel-mode switch
 extern _tss, current_task
@@ -79,8 +79,8 @@ move_to_user_mode:
     ; return to user mode
     iretd
 
-; void copy_from_user(char * kaddr, const char * uaddr)
-copy_from_user:
+; void memcpy_from_user (char * kaddr, const char * uaddr, int count)
+memcpy_from_user:
     push ebp
     mov ebp, esp
     push esi
@@ -89,13 +89,41 @@ copy_from_user:
     ; fs:esi -> es:edi
     mov edi, [ebp + 8]
     mov esi, [ebp + 12]
+    mov ecx, [ebp + 16]
 .loop:
+    cmp ecx, 0
+    je .end
     mov al, [fs:esi]
     mov [es:edi], al
-    cmp byte [fs:esi], 0
-    je .end
     inc edi
     inc esi
+    dec ecx
+    jmp .loop
+.end:
+    pop edi
+    pop esi
+    pop ebp
+    ret
+
+; void memcpy_to_user (char * uaddr, const char * kaddr, int count)
+memcpy_to_user:
+    push ebp
+    mov ebp, esp
+    push esi
+    push edi
+
+    ; ds:esi -> fs:edi
+    mov edi, [ebp + 8]
+    mov esi, [ebp + 12]
+    mov ecx, [ebp + 16]
+.loop:
+    cmp ecx, 0
+    je .end
+    mov al, [ds:esi]
+    mov [fs:edi], al
+    inc edi
+    inc esi
+    dec ecx
     jmp .loop
 .end:
     pop edi
@@ -118,11 +146,20 @@ strncpy_from_user:
     cmp ecx, 0
     je .end
     mov al, [fs:esi]
+    cmp al, 0
+    je .pad_zero
     mov [es:edi], al
     inc edi
     inc esi
     dec ecx
     jmp .loop
+.pad_zero:
+    cmp ecx, 0
+    je .end
+    mov byte [es:edi], 0
+    inc edi
+    dec ecx
+    jmp .pad_zero
 .end:
     pop edi
     pop esi

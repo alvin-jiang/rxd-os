@@ -32,14 +32,14 @@ kernelsrc = ./boot/head.asm \
 	$(wildcard ./kernel/*.asm) \
 	$(wildcard ./kernel/*.c) \
 	$(wildcard ./kernel/blk_drv/*.c) \
-	$(wildcard ./mm/*.c) #\
-	# $(wildcard ./fs/*.c)
+	$(wildcard ./mm/*.c) \
+	$(wildcard ./fs/*.c)
 kernelobjs = ./boot/head.o \
 	$(patsubst %.asm, %.o, $(wildcard ./kernel/*.asm)) \
 	$(patsubst %.c, %.o, $(wildcard ./kernel/*.c)) \
 	$(patsubst %.c, %.o, $(wildcard ./kernel/blk_drv/*.c)) \
-	$(patsubst %.c, %.o, $(wildcard ./mm/*.c)) #\
-	# $(patsubst %.c, %.o, $(wildcard ./fs/*.c))
+	$(patsubst %.c, %.o, $(wildcard ./mm/*.c)) \
+	$(patsubst %.c, %.o, $(wildcard ./fs/*.c))
 
 libsrc = $(wildcard ./lib/*.asm) $(wildcard ./lib/*.c)
 libobjs = $(patsubst %.asm, %.o, $(wildcard ./lib/*.asm)) \

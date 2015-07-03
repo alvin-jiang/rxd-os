@@ -27,7 +27,7 @@ typedef int atomic_t;
 
 typedef int sector_t;
 
-typedef unsigned long maddr_t;
+typedef long ptrdiff_t;
 
 #endif
 

@@ -27,6 +27,7 @@ static struct kmem_cache cache_cache = {
     LIST_HEAD_INIT(cache_cache.slabs_free),
     sizeof(struct kmem_cache),
     (PAGE_SIZE - sizeof(struct slab)) / (sizeof(struct kmem_cache) + sizeof(kmem_bufctl_t)),
+    NULL,
     "kmem_cache",
     LIST_HEAD_INIT(cache_cache.next)
 };
@@ -73,6 +74,7 @@ static struct slab * _create_slab(struct kmem_cache *cachep)
     unsigned char *page;
     struct slab *slab;
     kmem_bufctl_t *bufctl;
+    void *obj;
     int i;
 
     /* get page */
@@ -86,8 +88,18 @@ static struct slab * _create_slab(struct kmem_cache *cachep)
     slab->free = 0;
 
     bufctl = (kmem_bufctl_t *)slab;
-    for (i = 0; i < cachep->objcnt; ++i) {
-        *(--bufctl) = i + 1;
+    if (cachep->ctor) {
+        obj = slab->data;
+        for (i = 0; i < cachep->objcnt; ++i) {
+            *(--bufctl) = i + 1;
+            cachep->ctor(obj);
+            obj = (void *)((char *)obj + cachep->objsz);
+        }
+    }
+    else {
+        for (i = 0; i < cachep->objcnt; ++i) {
+            *(--bufctl) = i + 1;
+        }
     }
     *bufctl = BUFCTL_END;
 
@@ -180,7 +192,7 @@ void kmem_cache_free(struct kmem_cache *cachep, void *objp)
     _slab_free(objp);
 }
 
-struct kmem_cache * kmem_cache_create(const char *name, size_t objsize)
+struct kmem_cache * kmem_cache_createx(const char *name, size_t objsize, void (*ctor)(void *))
 {
     assert(name && objsize > 0);
 
@@ -191,11 +203,16 @@ struct kmem_cache * kmem_cache_create(const char *name, size_t objsize)
     INIT_LIST_HEAD(&(cachep->slabs_free)); assert(list_empty(&cachep->slabs_free));
     cachep->objsz = __align(objsize, 2); // 4 byte alignment
     cachep->objcnt = (PAGE_SIZE - sizeof(struct slab)) / (cachep->objsz + sizeof(kmem_bufctl_t));
-    cachep->name = name;
+    cachep->ctor = ctor;
 
+    cachep->name = name;
     list_add(&cachep->next, &cache_chain);
 
     return cachep;
+}
+struct kmem_cache * kmem_cache_create(const char *name, size_t objsize)
+{
+    return kmem_cache_createx(name, objsize, NULL);
 }
 
 int kmem_cache_destroy(struct kmem_cache *cachep)

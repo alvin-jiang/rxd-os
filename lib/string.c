@@ -86,14 +86,54 @@ char * strcpy (char * dst, const char * src)
     return dst;
 }
 
-char * strchr ( char * str, int character )
+char * strchr (const char * cstr, int character)
 {
-    __check_not_null(str);
+    __check_not_null(cstr);
+    char *str = (char *)cstr;
 
     while (*str != '\0' && *str != character) {
         ++str;
     }
     return (*str == character) ? str : NULL;
+}
+
+char * strrchr ( const char * cstr, int character )
+{
+    __check_not_null(cstr);
+    char *str = (char *)cstr;
+
+    char *p = str;
+    while (*str != '\0') {
+        if (*str == character)
+            p = str;
+        ++str;
+    }
+    /* '\0' */
+    if (*str == character)
+        p = str;
+    return (*p == character) ? p : NULL;
+}
+
+size_t strcspn ( const char * str1, const char * str2 )
+{
+    __check_not_null(str1);
+    __check_not_null(str2);
+    __cu8p(scan, str1);
+    __cu8p(match, str2);
+
+    /* build look-up table for faster search */
+    unsigned char T[256];
+    memset((void *)T, 0, sizeof(T));
+    do {
+        T[*match] = 1;
+    } while (*(match++) != '\0');
+
+    do {
+        if (T[*scan])
+            break;
+    } while (*(scan++) != '\0');
+
+    return (size_t)((const char *)scan - str1);
 }
 
 size_t strlen (const char * str)

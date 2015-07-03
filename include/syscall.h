@@ -16,6 +16,7 @@
 #define __NR_close 2
 #define __NR_read 3
 #define __NR_write 4
+ #define __NR_lseek 5
 
 /* marcos for syscall */
 #define _syscall0(type,name) \

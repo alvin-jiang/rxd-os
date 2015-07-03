@@ -13,10 +13,11 @@ void do_fork (void);
 
 syscall syscall_table[NR_SYSCALL] = {
     do_fork,
-    /*sys_open,*/
-    /*sys_close,*/
-    /*sys_read,*/
-    /*sys_write,*/
+    sys_open,
+    sys_close,
+    sys_read,
+    sys_write,
+    sys_lseek,
 };
 
 extern u32 * ret_from_fork;

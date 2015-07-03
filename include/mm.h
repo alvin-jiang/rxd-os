@@ -61,12 +61,14 @@ struct kmem_cache {
     unsigned int objsz;
     unsigned int objcnt;
     // unsigned int flags;
+    void (*ctor)(void *);
 
     const char *name;
     struct list_head next;
 };
 
 struct kmem_cache * kmem_cache_create(const char *name, size_t objsize);
+struct kmem_cache * kmem_cache_createx(const char *name, size_t objsize, void (*ctor)(void *));
 int kmem_cache_destroy(struct kmem_cache *cachep);
 void * kmem_cache_alloc(struct kmem_cache *cachep);
 void kmem_cache_free(struct kmem_cache *cachep, void *objp);

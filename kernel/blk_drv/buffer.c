@@ -63,6 +63,8 @@ void brelease(struct buffer_head *bh)
             ll_rw_block(bh->b_dev, BIO_WRITE, bh->b_blocknr * SECTORS_PER_BLK, SECTORS_PER_BLK, bh->b_data);
             bh->b_dirty = 0;
         }
+        else
+            printf("brelse: %d:%d\n", bh->b_dev, bh->b_blocknr);
     }
 }
 void bwrite(struct buffer_head *bh)

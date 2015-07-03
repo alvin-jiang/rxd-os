@@ -12,6 +12,8 @@
 #include "head.h"
 #include "keyboard.h"
 
+extern void scroll_screen(int line);
+
 int current_tty;
 static struct tty_struct tty_table[1] = {
     {0, {0, 0, 0, {0},}, {0, 0, 0, {0},},},
@@ -28,7 +30,19 @@ void on_keyboard_interrupt (int int_nr)
         tty_cook(tty);
         while (!QUEUE_EMPTY(tty->secondary)) {
             QUEUE_DEQ(tty->secondary, scan_code);
-            printf("%c", scan_code);
+            // printf("%c", scan_code);
+            switch(scan_code) {
+                case 'j':
+                case 'J':
+                    scroll_screen(3);
+                    break;
+                case 'k':
+                case 'K':
+                    scroll_screen(-3);
+                    break;
+                default:
+                    break;
+            }
             // printf("ECHO: %c 0x%x %c\n", scan_code, scan_code,
             //     (tty->kb_flag & KB_F_SHIFT) ? 'S' : ' ');
         }

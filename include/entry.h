@@ -12,7 +12,8 @@
 #define __ENTRY_H__
 
 extern void move_to_user_mode (void);
-extern void copy_from_user (char * kaddr, const char * uaddr);
+extern void memcpy_from_user (char * kaddr, const char * uaddr, int count);
+extern void memcpy_to_user (char * uaddr, const char * kaddr, int count);
 extern void strncpy_from_user (char * kaddr, const char * uaddr, int count);
 
 #define KERNEL_STACK_TOP(task) ((unsigned long *)((char *)(task) + PAGE_SIZE))

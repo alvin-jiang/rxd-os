@@ -8,7 +8,7 @@
 [SECTION .text]
 
 ; export kernel lib functions
-global printk
+global printk, scroll_screen
 
 ;-------------------------------------
 ; void printk(const char *s);
@@ -123,3 +123,49 @@ auto_scroll:
 .end:
     ret
 
+; void scroll_screen(int line)
+scroll_screen:
+    push ebp
+    mov ebp, esp
+    pushf
+    cli
+
+    mov eax, [ebp + 8]; line
+    mov ebx, 80
+    mul ebx
+    mov ebx, eax
+
+    mov al, 0xd
+    mov dx, 0x3d4
+    out dx, al
+    mov dx, 0x3d5
+    in al, dx
+    mov cl, al
+
+    mov al, 0xc
+    mov dx, 0x3d4
+    out dx, al
+    mov dx, 0x3d5
+    in al, dx
+    mov ch, al
+
+    movzx ecx, cx
+    add ecx, ebx
+
+    mov al, 0xd
+    mov dx, 0x3d4
+    out dx, al
+    mov al, cl
+    mov dx, 0x3d5
+    out dx, al
+
+    mov al, 0xc
+    mov dx, 0x3d4
+    out dx, al
+    mov al, ch
+    mov dx, 0x3d5
+    out dx, al
+
+    popf
+    pop ebp
+    ret

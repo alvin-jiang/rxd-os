@@ -36,8 +36,8 @@ void kmain(void)
     blk_dev_init();
     /* 128K ~ 576K, 448K */
     buffer_init(0x20000, 0x90000);
-    // io_init();
-    // fs_init();
+    io_init();
+    fs_init();
     
     sched_init();
     move_to_user_mode();
@@ -49,6 +49,9 @@ _syscall0(int, fork);
 /* open(pathname, flags, ...) */
 _syscall2(int, open, const char *, pathname, int, flags);
 _syscall1(int, close, int, fd);
+_syscall3(ssize_t, read, int, fd, void *, buf, size_t, count);
+_syscall3(ssize_t, write, int, fd, const void *, buf, size_t, count);
+_syscall3(off_t, lseek, int, fd, off_t, offset, int, whence);
 
 void mm_test(void);
 void cache_test(void);
@@ -60,11 +63,32 @@ void init ()
     printf("hello, init()\n");
 
     // mm_test();
-    cache_test();
+    // cache_test();
+
     // int fd = open("/abc", O_CREAT);
     // printf("open() returns %d\n", fd);
-    // if (fd != -1)
+    // fs_dump_cache();
+    // if (fd != -1) {
     //     close(fd);
+    //     fs_dump_cache();
+    // }
+
+    int ret;
+    char buffer[256];
+    const char *str = "hello, filesystem!";
+    int fd = open("/abc", O_CREAT);
+    printf("open() returns %d\n", fd);
+    if (fd != -1) {
+        ret = lseek(fd, 0, SEEK_END);
+        printf("lseek() returns %d\n", ret);
+        ret = write(fd, str, strlen(str) + 1);
+        assert(ret == strlen(str) + 1);
+        // ret = read(fd, buffer, sizeof(buffer));
+        // assert(ret > 0);
+        // buffer[ret] = '\0';
+        printf("from file-system: %s\n", buffer);
+        close(fd);
+    }
 
     while (1);
 }
